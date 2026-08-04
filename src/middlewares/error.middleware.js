@@ -36,17 +36,18 @@ export const errorHandler = (err, req, res, next) => {
   } else if (error.statusCode >= 400 && error.statusCode < 500) {
     // 4xx are client errors
     if (err.isOperational) {
-      // Expected operational errors like validation errors, authentication errors, etc. can be logged as 'info'
-      logger.info(`CLIENT ERROR (Operational) 🔍 ${err.message}`, {
+      // Expected operational errors like validation errors, authentication errors, etc. can be logged as 'warn'
+      logger.warn(`CLIENT ERROR (Operational) 🔍 ${err.message}`, {
         code: err.code,
         method: req.method,
         path: req.route?.path,
         url: req.originalUrl,
+        ip: req.ip,
         userId: req.user?.id,
       });
     } else {
       // Unexpected client errors can be logged as 'warn'
-      logger.warn("CLIENT ERROR 🚨", err, { cause: err.cause?.message });
+      logger.error("CLIENT ERROR 🚨", err, { cause: err.cause?.message });
     }
   } else {
     // Fallback for any other errors that don't fit the above categories
@@ -75,6 +76,7 @@ export const errorHandler = (err, req, res, next) => {
         DEFAULT_CODES[error.statusCode] ||
         (error.statusCode >= 500 ? "INTERNAL_ERROR" : "CLIENT_ERROR"),
       message: error.message,
+      errors: err.isOperational ? error.errors : undefined,
       stack: finalConfig.env === "development" ? err.stack : undefined,
     },
   });

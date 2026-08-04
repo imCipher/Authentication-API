@@ -26,7 +26,7 @@ const getLevel = () => {
 
 // Define colors for each level
 const colors = {
-  error: "white redBG", // White for the font color and redBg for the background color
+  error: "redBG", // White for the font color and redBg for the background color
   warn: "yellow",
   info: "blue",
   http: "green",

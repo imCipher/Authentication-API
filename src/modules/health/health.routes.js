@@ -1,6 +1,6 @@
 import { Router } from "express";
-import prisma from "../config/db.js";
-import finalConfig from "../config/keys.js";
+import prisma from "../../config/db.js";
+import finalConfig from "../../config/keys.js";
 
 // Initiate Express Router
 const router = Router();

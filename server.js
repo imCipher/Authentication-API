@@ -2,6 +2,7 @@ import app from "./src/app.js";
 import finalConfig, { validateConfig } from "./src/config/keys.js";
 import logger from "./src/config/logger.js";
 import prisma from "./src/config/db.js";
+import redisService from "./src/config/redis.js";
 
 // Handle unhandled Promise Rejections
 process.on("unhandledRejection", err => {
@@ -35,6 +36,9 @@ const startServer = async () => {
     await prisma.$connect();
 
     logger.info("✅ Database connected successfully");
+
+    // Connection to redis
+    await redisService.connect()
 
     // Start the server
     const server = app.listen(PORT, () => {

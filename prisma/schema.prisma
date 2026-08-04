@@ -18,18 +18,336 @@ enum UserRole {
 enum UserStatus {
   ACTIVE
   DEACTIVATED
+  SUSPENDED
+}
+
+enum OauthProvider {
+  GOOGLE
+  GITHUB
+}
+
+enum AuditAction {
+  PASSWORD_CHANGE
+  PASSWORD_RESET
+  EMAIL_CHANGE
+  EMAIL_VERIFIED
+  ROLE_CHANGE
+  STATUS_CHANGE
+  OAUTH_ACCOUNT_LINKED
+  TOKEN_REUSE_DETECTED
+  LOGOUT_ALL
+  ACCOUNT_LOCKED
+}
+
+// User - Manages Users details
+model User {
+  id                  String      @id @default(uuid())  @db.Uuid
+  fullName            String      @map("full_name")
+  username            String      @unique
+  email               String      @unique
+  passwordHash        String?     @map("password_hash")  // Nullable for Only Oauth Authenticated Account
+  role                UserRole    @default(USER) 
+  emailVerified       Boolean     @default(false)     @map("email_verified")
+  lastLoginAt         DateTime?   @map("last_login_at")
+  lastLoginIp         String?     @map("last_login_ip")
+  passwordChangedAt   DateTime?   @map("password_changed_at")  // jwt issued before this time are rejected
+  failedAttempts      Int         @default(0) @map("failed_attempts")
+  status              UserStatus  @default(ACTIVE)
+  lockedUntil         DateTime?   @map("locked_until")
+  createdAt           DateTime    @default(now())        @map("created_at")
+  updatedAt           DateTime    @updatedAt             @map("updated_at")
+
+  // Relations
+  refreshTokens      RefreshToken[]
+  emailVerifications EmailVerification[]
+  passwordResets     PasswordReset[]
+  oauthAccounts      OauthAccount[]
+  loginHistory       LoginHistory[]
+  auditLogs          AuditLog[]
+  oauthExchangeCodes  OauthExchangeCode[]
+
+  @@map("users")
+}
+
+
+
+// RefreshToken - Manages refresh tokens for secure token rotation
+model RefreshToken {
+  id            String    @id @default(uuid())  @db.Uuid
+  tokenHash     String    @unique @map("token_hash")
+  userId        String    @map("user_id") @db.Uuid
+  userAgent     String?   @map("user_agent")
+  ipAddress     String?   @map("ip_address")
+  expiresAt     DateTime  @map("expires_at")
+  revokedAt     DateTime? @map("revoked_at")
+  replacedBy    String?   @map("replaced_by") @db.Uuid // Points to the token it was replaced by
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// Email Verification - Manages email token for users
+model EmailVerification {
+  id        String    @id @default(uuid())  @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique  @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  //Relations
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verifications")
+}
+
+// Password Verification - Manages password token for users
+model PasswordReset {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique  @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+// OauthAccount - Manages oauth signed users
+model OauthAccount {
+  id              String          @id @default(uuid())  @db.Uuid
+  provider        OauthProvider
+  providerUserId  String          @map("provider_user_id")
+  userId          String          @map("user_id") @db.Uuid
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt  @map("updated_at")
+
+  // Relations
+  user User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+// LoginHistory - Tracks User login history
+model LoginHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  ipAddress String   @map("ip_address")
+  userAgent String?  @map("user_agent")
+  success   Boolean
+  reason    String?  // "invalid_password", "account_locked", etc.
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("login_history")
+}
+
+// Short-lived single-use codes handed to the client after an OAuth callback,
+// so tokens never travel in a redirect URL
+model OauthExchangeCode {
+  id    String    @id @default(uuid()) @db.Uuid
+  userId  String  @map("user_id") @db.Uuid
+  codeHash  String  @map("code_hash") @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime?   @map("used_at")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("oauth_exchange_codes")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  DEACTIVATED
+  SUSPENDED         // Added: locked by system (failed login attempts)
+}
+
+enum OAuthProvider {
+  GOOGLE
+  GITHUB
+}
+
+// Enum rather than free string: the action set is small and stable, so the
+// database enforces valid values and typos ("PASSWORD_CHANGE" vs "password_change")
+// become impossible. Adding an action requires a migration — an acceptable trade.
+enum AuditAction {
+  PASSWORD_CHANGE
+  PASSWORD_RESET
+  EMAIL_CHANGE
+  EMAIL_VERIFIED
+  ROLE_CHANGE
+  STATUS_CHANGE
+  OAUTH_ACCOUNT_LINKED
+  TOKEN_REUSE_DETECTED
+  LOGOUT_ALL
+  ACCOUNT_LOCKED
 }
 
 model User {
-  id        String    @id @default(uuid()) @db.Uuid
-  fullName  String    @map("full_name")
-  username  String    @unique
-  email     String?   @unique
-  passwordHash   String @map("password_hash")
-  role    UserRole    @default(USER)
-  status  UserStatus  @default(ACTIVE)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id             String      @id @default(uuid()) @db.Uuid
+  fullName       String      @map("full_name")
+  username       String      @unique
+  email          String      @unique       // No longer optional — required for auth flows
+  passwordHash   String?     @map("password_hash")  // Nullable for OAuth-only users
+  role           UserRole    @default(USER)
+  status         UserStatus  @default(ACTIVE)
+  emailVerified  Boolean     @default(false) @map("email_verified")
+  failedAttempts Int         @default(0) @map("failed_attempts")
+  lockedUntil    DateTime?   @map("locked_until")
+  passwordChangedAt DateTime? @map("password_changed_at")  // JWTs issued before this are rejected
+  lastLoginAt    DateTime?   @map("last_login_at")
+  lastLoginIp    String?     @map("last_login_ip")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  refreshTokens       RefreshToken[]
+  emailVerifications  EmailVerification[]
+  passwordResets      PasswordReset[]
+  oauthAccounts       OAuthAccount[]
+  oauthExchangeCodes  OAuthExchangeCode[]
+  loginHistory        LoginHistory[]
+  auditLogs           AuditLog[]
 
   @@map("users")
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid()) @db.Uuid
+  tokenHash   String    @unique @map("token_hash")    // Store hash, never plaintext
+  userId      String    @map("user_id") @db.Uuid
+  userAgent   String?   @map("user_agent")
+  ipAddress   String?   @map("ip_address")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  replacedBy  String?   @map("replaced_by") @db.Uuid  // Points to the token that replaced this one
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model EmailVerification {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String   @unique @map("token_hash")
+  userId    String   @map("user_id") @db.Uuid
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verifications")
+}
+
+model PasswordReset {
+  id        String    @id @default(uuid()) @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  userId    String    @map("user_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+model OAuthAccount {
+  id             String        @id @default(uuid()) @db.Uuid
+  provider       OAuthProvider
+  providerUserId String        @map("provider_user_id")
+  userId         String        @map("user_id") @db.Uuid
+  accessToken    String?       @map("access_token")     // AES-256-GCM encrypted (see 9.9) — omit entirely if login-only
+  refreshToken   String?       @map("refresh_token")     // AES-256-GCM encrypted (see 9.9) — omit entirely if login-only
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model LoginHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  ipAddress String   @map("ip_address")
+  userAgent String?  @map("user_agent")
+  success   Boolean
+  reason    String?                        // "invalid_password", "account_locked", etc.
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("login_history")
+}
+
+// Short-lived single-use codes handed to the client after an OAuth callback,
+// so tokens never travel in a redirect URL (see 6.6)
+model OAuthExchangeCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  codeHash  String    @unique @map("code_hash")   // SHA-256, never plaintext
+  userId    String    @map("user_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at")          // now + 60 seconds
+  usedAt    DateTime? @map("used_at")             // single use — set on exchange
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("oauth_exchange_codes")
+}
+
+// Security-relevant state changes. Login attempts go to LoginHistory, NOT here.
+model AuditLog {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String?     @map("user_id")  @db.Uuid
+  action    AuditAction
+  resource  String?     // e.g., "auth", "user"
+  details   Json?       // Additional context
+  ipAddress String?     @map("ip_address")
+  userAgent String?     @map("user_agent")
+  success   Boolean     @default(true)
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

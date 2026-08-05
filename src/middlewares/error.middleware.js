@@ -39,6 +39,7 @@ export const errorHandler = (err, req, res, next) => {
       // Expected operational errors like validation errors, authentication errors, etc. can be logged as 'warn'
       logger.warn(`CLIENT ERROR (Operational) 🔍 ${err.message}`, {
         code: err.code,
+        cause: err.cause?.message,
         method: req.method,
         path: req.route?.path,
         url: req.originalUrl,

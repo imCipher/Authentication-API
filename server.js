@@ -38,7 +38,7 @@ const startServer = async () => {
     logger.info("✅ Database connected successfully");
 
     // Connection to redis
-    await redisService.connect()
+    await redisService.connect();
 
     // Start the server
     const server = app.listen(PORT, () => {
@@ -56,6 +56,9 @@ const startServer = async () => {
         // Disconnect Database
         await prisma.$disconnect();
         logger.info("Database Connection Closed");
+
+        // Disconnect Redis
+        await redisService.disconnect();
 
         process.exit(0);
       });

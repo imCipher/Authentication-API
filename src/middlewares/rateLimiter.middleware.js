@@ -102,8 +102,8 @@ const createRateLimiterWithFallback = ({
 export const registerRateLimiter = createRateLimiterWithFallback({
   storePrefix: "rl:register:",
   label: "register",
-  windowMs: 60 * 1000, // 1 minute
-  max: 5, // 5 requests per minute per IP
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 requests per 15 minutes per IP
   message:
     "Too many registration attempts from this IP, please try again in a minute.",
 });
@@ -157,10 +157,23 @@ export const generalRateLimiter = createRateLimiterWithFallback({
   message: "Too many requests from this IP, please try again later.",
 });
 
+/**
+ * Oauth Exchange Rate Limiter (for /oauth/exchange route)
+ * Strict — this route is a common abuse target for brute-force attacks
+ */
+export const oauthExchangeRateLimiter = createRateLimiterWithFallback({
+  storePrefix: "rl:oauth-exchange:",
+  label: "oauth-exchange",
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 requests per 15 minutes per IP
+  message: "Too many OAuth exchange attempts from this IP, please try again later.",
+});
+
 export default {
   registerRateLimiter,
   authRateLimiter,
   emailVerificationRateLimiter,
   passwordResetRateLimiter,
   generalRateLimiter,
+  oauthExchangeRateLimiter,
 };

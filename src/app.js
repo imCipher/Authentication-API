@@ -1,7 +1,6 @@
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
-import { xss } from "express-xss-sanitizer";
 import passport from "passport";
 import cors from "cors";
 
@@ -30,14 +29,16 @@ app.use(express.urlencoded({ extended: true, limit: "100kb" })); // Limit the UR
 // Rate Limiting
 app.use(generalRateLimiter);
 
-app.use(xss()); // Sanitize user input to prevent XSS attack
 app.use(morganLogger); // Use custom morgan logger for HTTP request logging
 
 // Initialize Passport for authentication
 app.use(passport.initialize());
 
+// API Versioning
+const apiPrefix = `/api/${finalConfig.apiVersion}`;
+
 // Routes
-app.use("/health", healthRoutes);
+app.use(`${apiPrefix}/health`, healthRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

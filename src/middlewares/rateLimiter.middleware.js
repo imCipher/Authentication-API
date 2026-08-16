@@ -32,12 +32,14 @@ const createRateLimiterWithFallback = ({
   storePrefix,
   windowMs,
   max,
+  skipSuccessfulRequests = false,
   label,
   message,
 }) => {
   const sharedOptions = {
     windowMs,
     max,
+    skipSuccessfulRequests,
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
     passOnStoreError: true, // Fail open if the store errors mid-flight
@@ -105,7 +107,21 @@ export const registerRateLimiter = createRateLimiterWithFallback({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 requests per 15 minutes per IP
   message:
-    "Too many registration attempts from this IP, please try again in a minute.",
+    "Too many registration attempts from this IP, please try again later.",
+});
+
+/**
+ * Rate limiter for login route
+ * Limits requests to 3 failed login attempts per 15 minutes per IP address
+ */
+export const loginRateLimiter = createRateLimiterWithFallback({
+  storePrefix: "rl:login:",
+  label: "login",
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3, // 3 requests per 15 minutes per IP
+  skipSuccessfulRequests: true, // Only count failed login attempts
+  message:
+    "Too many failed login attempts from this IP, please try again later.",
 });
 
 /**
@@ -166,7 +182,8 @@ export const oauthExchangeRateLimiter = createRateLimiterWithFallback({
   label: "oauth-exchange",
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 requests per 15 minutes per IP
-  message: "Too many OAuth exchange attempts from this IP, please try again later.",
+  message:
+    "Too many OAuth exchange attempts from this IP, please try again later.",
 });
 
 export default {

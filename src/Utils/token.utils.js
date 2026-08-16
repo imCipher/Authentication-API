@@ -10,7 +10,7 @@ import finalConfig from "../config/keys.js";
  * @param {Object} user - Must contain id and role properties
  * @returns {string} - Signed JWT with minimal claims
  */
-export const signAccessToken = ({ id, role }) => {
+const signAccessToken = ({ id, role }) => {
   return jwt.sign({ sub: id, role }, finalConfig.jwt.accessSecret, {
     expiresIn: finalConfig.jwt.accessExpiresIn,
     algorithm: "HS256",
@@ -22,7 +22,7 @@ export const signAccessToken = ({ id, role }) => {
  * 64 random bytes -> 128-char hex string.
  * @returns {string} - Cryptographically random token
  */
-export const signRefreshToken = () => {
+const signRefreshToken = () => {
   return crypto.randomBytes(64).toString("hex");
 };
 
@@ -32,7 +32,7 @@ export const signRefreshToken = () => {
  * @returns {Object} - Decoded payload ({sub, role, iat, exp})
  * @throws {ApiError} - 401 on expired or invalid token
  */
-export const verifyAccessToken = token => {
+const verifyAccessToken = token => {
   try {
     return jwt.verify(token, finalConfig.jwt.accessSecret, {
       algorithms: ["HS256"],
@@ -60,7 +60,7 @@ export const verifyAccessToken = token => {
  * @returns {string} - Hex-encoded hash
  * @throws {TypeError} - If no token is supplied (caller bug, not a client error)
  */
-export const hashToken = token => {
+const hashToken = token => {
   // A missing token here means the caller forgot to pass one — the caller is
   // responsible for validating the request and throwing its own 401. A plain
   // TypeError leaves isOperational falsy, so this is logged as an error with a
@@ -71,9 +71,48 @@ export const hashToken = token => {
   return crypto.createHash("sha256").update(token).digest("hex");
 };
 
+/**
+ * Verifies a hashed token against a plaintext token.
+ * @param {String} dbHash - The hashed token stored in the database.
+ * @param {String} token - The plaintext token to verify.
+ * @returns {Boolean} - True if the tokens match, false otherwise.
+ */
+const verifyHash = (dbHash, token) => {
+  const clientHash = crypto.createHash("sha256").update(token).digest("hex");
+
+  const isValid = crypto.timingSafeEqual(
+    Buffer.from(dbHash),
+    Buffer.from(clientHash),
+  );
+
+  return isValid;
+};
+
+/**
+ * Generates a verification token with a specified number of digits.
+ * @param {Number} digit - The number of digits for the verification token.
+ * @returns {String} - The generated verification token.
+ */
+const verificationToken = (digit = 6) => {
+  return String(crypto.randomInt(0, 10 ** digit)).padStart(digit, "0");
+};
+
+/**
+ * Calculates the expiration time for a token.
+ * @param {Number} time - The time in minutes until expiration.
+ * @returns {Date} - The expiration date.
+ */
+const expiresAt = (time = 15) => {
+  const timeInMin = time * 60 * 1000;
+  return new Date(Date.now() + timeInMin);
+};
+
 export default {
   signAccessToken,
   signRefreshToken,
   verifyAccessToken,
   hashToken,
+  verificationToken,
+  expiresAt,
+  verifyHash,
 };

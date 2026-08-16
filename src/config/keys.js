@@ -11,11 +11,53 @@ const config = {
   port: parseInt(process.env.PORT, 10) || 5000,
   apiVersion: process.env.API_VERSION || "v1",
 
+  // Lockout
+  lockout: {
+    maxFailedAttempts:
+      parseInt(process.env.LOCKOUT_MAX_FAILED_ATTEMPTS, 10) || 5,
+    lockoutDuration:
+      parseInt(process.env.LOCKOUT_DURATION, 10) || 15 * 60 * 1000, // 15 minutes
+  },
+
+  // Nodemailer
+  email: {
+    host: process.env.EMAIL_HOST,
+    port: parseInt(process.env.EMAIL_PORT, 10) || 587,
+    secure: process.env.EMAIL_SECURE === "true", // true for 465, false for other ports
+    user: process.env.EMAIL_USER.toLowerCase(),
+    pass: process.env.EMAIL_PASS,
+    from: process.env.EMAIL_FROM,
+  },
+
+  // Google OAuth
+  googleOAuth: {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackUrl: process.env.GOOGLE_CALLBACK_URL,
+  },
+
+  // Github OAuth
+  githubOAuth: {
+    clientId: process.env.GITHUB_CLIENT_ID,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    callbackUrl: process.env.GITHUB_CALLBACK_URL,
+  },
+
+  // Redis
+  redis: {
+    host: process.env.REDIS_HOST,
+    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    username: process.env.REDIS_USERNAME,
+    password: process.env.REDIS_PASSWORD,
+    db: parseInt(process.env.REDIS_DB, 10) || 0,
+  },
+
   // JWT
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET,
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
+    refreshSecret: process.env.JWT_REFRESH_SECRET,
+    refreshExpiresIn: parseInt(process.env.JWT_REFRESH_EXPIRES_IN, 10) || 7, // Default 7 days
   },
 
   // Cors
@@ -48,6 +90,18 @@ export const validateConfig = () => {
         `Missing required environment variables: ${missing.join(", ")}`,
       );
     }
+  }
+
+  if (!config.jwt.refreshSecret || config.jwt.refreshSecret.length < 32) {
+    throw new Error(
+      "JWT_REFRESH_SECRET is not set or is too short. Token signing cannot work.",
+    );
+  }
+
+  if (!/^[0-9]$/.test(String(config.jwt.refreshExpiresIn))) {
+    throw new Error(
+      `JWT_REFRESH_EXPIRES_IN must be a number (e.g. "7"), got "${config.jwt.refreshExpiresIn}"`,
+    );
   }
 
   if (!config.jwt.accessSecret || config.jwt.accessSecret.length < 32) {

@@ -57,13 +57,13 @@ export const errorHandler = (err, req, res, next) => {
 
   // Handle specific error types and customize the response accordingly
   // Handle Validation Error
-  if (err.name === "ValidationError") {
-    const errors = Object.values(err.errors).map(el => ({
-      field: el.path,
-      message: el.message,
-    }));
-    error = ApiError.badRequest("Validation Failed", errors);
-  }
+  // if (err.name === "ValidationError") {
+  //   const errors = Object.values(err.errors).map(el => ({
+  //     field: el.path,
+  //     message: el.message,
+  //   }));
+  //   error = ApiError.badRequest("Validation Failed", errors);
+  // }
 
   // Handle Duplicate Error
 

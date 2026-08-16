@@ -7,7 +7,7 @@ import crypto from "crypto";
  * @returns {Promise<string>} - A promise that resolves to the hashed password.
  * @throws {Error} - If hashing fails.
  */
-export const hashPassword = async password => {
+const hashPassword = async password => {
   return await argon2.hash(password, {
     type: argon2.argon2id, // argon2id is a hybrid combination of the above, being resistant against GPU and tradeoff attacks
   });
@@ -20,7 +20,7 @@ export const hashPassword = async password => {
  * @returns {Promise<boolean>} - A promise that resolves to true if the password matches, false otherwise.
  * @throws {Error} - If verification fails.
  */
-export const comparePassword = async (hashedPassword, password) => {
+const comparePassword = async (hashedPassword, password) => {
   // OAuth-only accounts have a null passwordHash.
   // argon2.verify() THROWS on a null/malformed hash, so guard first
   // - a missing hash is a failed login, not a server error.
@@ -43,7 +43,13 @@ const DUMMY_HASH = await argon2.hash(crypto.randomBytes(32).toString("hex"), {
  * user (or no passwordHash) exists. This prevents timing attacks that reveal which emails are registered.
  * @returns {Promise<boolean>} - Always resolves to false, but takes the same time as a real password check.
  */
-export const fakeComparePassword = async () => {
+const fakeComparePassword = async () => {
   await argon2.verify(DUMMY_HASH, "not-a-real-password");
   return false;
+};
+
+export default {
+  hashPassword,
+  comparePassword,
+  fakeComparePassword,
 };

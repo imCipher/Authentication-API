@@ -9,6 +9,7 @@ import finalConfig from "./config/keys.js";
 import { notFound, errorHandler } from "./middlewares/error.middleware.js";
 import { generalRateLimiter } from "./middlewares/rateLimiter.middleware.js";
 import healthRoutes from "./modules/health/health.routes.js";
+import authRoutes from "./modules/auth/auth.routes.js";
 
 // Initialize Express App
 const app = express();
@@ -39,6 +40,7 @@ const apiPrefix = `/api/${finalConfig.apiVersion}`;
 
 // Routes
 app.use(`${apiPrefix}/health`, healthRoutes);
+app.use(`${apiPrefix}/auth`, authRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

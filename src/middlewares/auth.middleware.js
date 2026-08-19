@@ -17,7 +17,7 @@ export const protect = async (req, res, next) => {
     if (!token) {
       return next(
         ApiError.unauthorized(
-          "You are not logged in! Please log in to get access."
+          "You are not logged in! Please log in to get access.",
         ),
       );
     }
@@ -29,10 +29,18 @@ export const protect = async (req, res, next) => {
       decoded.role,
     );
 
+    if (decoded.iat >= currentUser.passwordChangedAt.getTime() / 1000) {
+      return next(
+        ApiError.unauthorized(
+          "You have recently changed your password. Please log in again.",
+        ),
+      );
+    }
+
     if (!currentUser) {
       return next(
         ApiError.unauthorized(
-          "The user belonging to this token no longer exists.",
+          "This user no longer exists. Please log in or register again.",
         ),
       );
     }

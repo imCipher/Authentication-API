@@ -47,4 +47,10 @@ router.post(
   authController.resendVerification,
 );
 
+router.post(
+  "/refresh-token",
+  validateRequest(authSchema.refreshTokenSchema),
+  authController.refreshToken,
+);
+
 export default router;

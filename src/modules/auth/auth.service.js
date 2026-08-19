@@ -7,6 +7,7 @@ import hashUtils from "../../utils/hash.utils.js";
 import tokenUtils from "../../utils/token.utils.js";
 import Email from "../../Utils/email.utils.js";
 import finalConfig from "../../config/keys.js";
+import { access } from "fs";
 
 /**
  * Service class for handling user-related business logic.
@@ -77,6 +78,68 @@ class AuthService {
 
     return user;
   }
+
+  async rotateRefreshToken(refreshToken, { userIp, userAgent }) {
+    const hashedToken = tokenUtils.hashToken(refreshToken);
+    const tokenInfo = await prisma.refreshToken.findFirst({
+      where: {
+        tokenHash: hashedToken,
+        ipAddress: userIp,
+        userAgent,
+      },
+      select: {
+        id: true,
+        userId: true,
+        expiresAt: true,
+        revokedAt: true,
+        user: {
+          select: {
+            id: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!tokenInfo) {
+      throw ApiError.unauthorized("Invalid refresh token", {
+        code: "TOKEN_INVALID",
+      });
+    } else if (tokenInfo.expiresAt < new Date()) {
+      throw ApiError.unauthorized("Refresh token expired", {
+        code: "TOKEN_EXPIRED",
+      });
+    }
+
+    if (tokenInfo.revokedAt) {
+      await prisma.refreshToken.updateMany({
+        where: { userId: tokenInfo.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw ApiError.unauthorized(
+        "Refresh token reuse detected. All sessions have been revoked.",
+        {
+          code: "TOKEN_REVOKED",
+        },
+      );
+    }
+
+    // Revoke the old refresh token
+    await prisma.refreshToken.update({
+      where: { id: tokenInfo.id },
+      data: { revokedAt: new Date(), replacedByToken: newHashedToken },
+    });
+
+    const accessToken = await this.generateAccessToken(tokenInfo.user);
+
+    const newRefreshToken = await this.generateRefreshToken(tokenInfo.userId, {
+      userIp,
+      userAgent,
+    });
+
+    return { accessToken, refreshToken: newRefreshToken };
+  }
+
   async getUserById(userId, role) {
     const user = await prisma.user.findFirst({
       where: {
@@ -91,6 +154,7 @@ class AuthService {
         role: true,
         emailVerified: true,
         createdAt: true,
+        passwordChangedAt: true,
       },
     });
     return user;

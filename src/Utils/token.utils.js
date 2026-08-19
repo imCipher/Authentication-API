@@ -77,8 +77,8 @@ const hashToken = token => {
  * @param {String} token - The plaintext token to verify.
  * @returns {Boolean} - True if the tokens match, false otherwise.
  */
-const verifyHash = (dbHash, token) => {
-  const clientHash = crypto.createHash("sha256").update(token).digest("hex");
+const verifyHash = (dbHash, clientHash) => {
+  // const clientHash = crypto.createHash("sha256").update(token).digest("hex");
 
   const isValid = crypto.timingSafeEqual(
     Buffer.from(dbHash),

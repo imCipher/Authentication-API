@@ -30,6 +30,25 @@ const register = CatchAsync(async (req, res, next) => {
   });
 });
 
+const refreshToken = CatchAsync(async (req, res, next) => {
+  const { refreshToken } = req.validated.body;
+  const { userIp, userAgent } = getRequestMetadata(req);
+
+  const token = await AuthService.rotateRefreshToken(refreshToken, {
+    userIp,
+    userAgent,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Token refreshed successfully.",
+    tokens: {
+      accessToken: token.accessToken,
+      refreshToken: token.refreshToken,
+    },
+  });
+});
+
 const resendVerification = CatchAsync(async (req, res, next) => {
   const user = req.user; // Assuming the user is already authenticated and available in req.user
   if (!user) {
@@ -50,4 +69,5 @@ const resendVerification = CatchAsync(async (req, res, next) => {
 export default {
   register,
   resendVerification,
+  refreshToken,
 };

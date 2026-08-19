@@ -142,4 +142,21 @@ const resendVerificationSchema = {
     .strict(),
 };
 
-export default { registerSchema, loginSchema, resendVerificationSchema };
+/**
+ * Validation schema for refreshing authentication tokens.
+ * This schema ensures that the refresh token is provided and meets the specified criteria.
+ */
+const refreshTokenSchema = {
+  body: z
+    .object({
+      refreshToken: z.string("Refresh token is required").min(1),
+    })
+    .strict(),
+};
+
+export default {
+  registerSchema,
+  loginSchema,
+  resendVerificationSchema,
+  refreshTokenSchema,
+};

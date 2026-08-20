@@ -16,7 +16,7 @@ const register = CatchAsync(async (req, res, next) => {
   });
 
   const accessToken = await AuthService.generateAccessToken(user);
-  const refreshToken = await AuthService.generateRefreshToken(
+  const { refreshToken } = await AuthService.generateRefreshToken(
     user.id,
     getRequestMetadata(req),
   );
@@ -49,6 +49,15 @@ const refreshToken = CatchAsync(async (req, res, next) => {
   });
 });
 
+const verifyEmail = CatchAsync(async (req, res, next) => {
+  const { token } = req.validated.body;
+  await AuthService.verifyEmail(token);
+  res.status(200).json({
+    success: true,
+    message: "Email verified successfully.",
+  });
+});
+
 const resendVerification = CatchAsync(async (req, res, next) => {
   const user = req.user; // Assuming the user is already authenticated and available in req.user
   if (!user) {
@@ -70,4 +79,5 @@ export default {
   register,
   resendVerification,
   refreshToken,
+  verifyEmail,
 };

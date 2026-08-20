@@ -72,23 +72,6 @@ const hashToken = token => {
 };
 
 /**
- * Verifies a hashed token against a plaintext token.
- * @param {String} dbHash - The hashed token stored in the database.
- * @param {String} token - The plaintext token to verify.
- * @returns {Boolean} - True if the tokens match, false otherwise.
- */
-const verifyHash = (dbHash, clientHash) => {
-  // const clientHash = crypto.createHash("sha256").update(token).digest("hex");
-
-  const isValid = crypto.timingSafeEqual(
-    Buffer.from(dbHash),
-    Buffer.from(clientHash),
-  );
-
-  return isValid;
-};
-
-/**
  * Generates a verification token with a specified number of digits.
  * @param {Number} digit - The number of digits for the verification token.
  * @returns {String} - The generated verification token.
@@ -114,5 +97,4 @@ export default {
   hashToken,
   verificationToken,
   expiresAt,
-  verifyHash,
 };

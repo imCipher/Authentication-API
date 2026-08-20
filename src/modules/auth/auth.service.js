@@ -37,7 +37,7 @@ class AuthService {
 
     const hashedPassword = await hashUtils.hashPassword(password);
 
-    const token = tokenUtils.verificationToken(4);
+    const token = tokenUtils.verificationToken(6);
     let hashToken = tokenUtils.hashToken(token);
     let expiryTime = tokenUtils.expiresAt(5);
 
@@ -124,12 +124,6 @@ class AuthService {
       );
     }
 
-    // Revoke the old refresh token
-    await prisma.refreshToken.update({
-      where: { id: tokenInfo.id },
-      data: { revokedAt: new Date(), replacedByToken: newHashedToken },
-    });
-
     const accessToken = await this.generateAccessToken(tokenInfo.user);
 
     const newRefreshToken = await this.generateRefreshToken(tokenInfo.userId, {
@@ -137,7 +131,13 @@ class AuthService {
       userAgent,
     });
 
-    return { accessToken, refreshToken: newRefreshToken };
+    // Revoke the old refresh token
+    await prisma.refreshToken.update({
+      where: { id: tokenInfo.id },
+      data: { revokedAt: new Date(), replacedBy: newRefreshToken.id },
+    });
+
+    return { accessToken, refreshToken: newRefreshToken.refreshToken };
   }
 
   async getUserById(userId, role) {
@@ -171,7 +171,7 @@ class AuthService {
     const hashedRefreshToken = tokenUtils.hashToken(refreshToken);
     const expiryTime = tokenUtils.expiresAt(daysUntilExpiry * 24 * 60);
 
-    await prisma.refreshToken.create({
+    const newRefreshToken = await prisma.refreshToken.create({
       data: {
         userId,
         tokenHash: hashedRefreshToken,
@@ -179,13 +179,50 @@ class AuthService {
         userAgent: metadata.userAgent,
         ipAddress: metadata.userIp,
       },
+      select: {
+        id: true,
+      },
     });
-    return refreshToken;
+    return { refreshToken, id: newRefreshToken.id };
+  }
+
+  async verifyEmail(token) {
+    const hashedToken = tokenUtils.hashToken(token);
+    const verificationRecord = await prisma.emailVerification.findFirst({
+      where: {
+        tokenHash: hashedToken,
+        expiresAt: { gte: new Date() },
+      },
+    });
+
+    if (!verificationRecord) {
+      throw ApiError.badRequest("Token is invalid or  has expired", {
+        code: "TOKEN_INVALID",
+      });
+    }
+
+    await prisma.$transaction(async tx => {
+      await tx.emailVerification.update({
+        where: { id: verificationRecord.id },
+        data: {
+          usedAt: new Date(),
+        },
+      });
+
+      await tx.user.update({
+        where: { id: verificationRecord.userId },
+        data: {
+          emailVerified: true,
+        },
+      });
+    });
+
+    return true;
   }
 
   async resendVerificationEmail(user) {
     const email = user.email;
-    const token = tokenUtils.verificationToken(4);
+    const token = tokenUtils.verificationToken(6);
     const hashedToken = tokenUtils.hashToken(token);
     const expiryTime = tokenUtils.expiresAt(5);
     await prisma.$transaction(async tx => {

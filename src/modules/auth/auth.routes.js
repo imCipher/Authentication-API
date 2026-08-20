@@ -48,6 +48,13 @@ router.post(
 );
 
 router.post(
+  "/verify-email",
+  emailVerificationRateLimiter,
+  validateRequest(authSchema.verifyEmailSchema),
+  authController.verifyEmail,
+);
+
+router.post(
   "/refresh-token",
   validateRequest(authSchema.refreshTokenSchema),
   authController.refreshToken,

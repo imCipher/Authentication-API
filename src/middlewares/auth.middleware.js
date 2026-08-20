@@ -29,12 +29,14 @@ export const protect = async (req, res, next) => {
       decoded.role,
     );
 
-    if (decoded.iat >= currentUser.passwordChangedAt.getTime() / 1000) {
-      return next(
-        ApiError.unauthorized(
-          "You have recently changed your password. Please log in again.",
-        ),
-      );
+    if (currentUser.passwordChangedAt) {
+      if (decoded.iat >= currentUser.passwordChangedAt.getTime() / 1000) {
+        return next(
+          ApiError.unauthorized(
+            "You have recently changed your password. Please log in again.",
+          ),
+        );
+      }
     }
 
     if (!currentUser) {

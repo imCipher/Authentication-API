@@ -154,9 +154,20 @@ const refreshTokenSchema = {
     .strict(),
 };
 
+/**
+ * Validation schema for verifying email addresses.
+ * This schema ensures that the verification token is provided and meets the specified criteria.
+ */
+const verifyEmailSchema = {
+  body: z.object({
+    token: z.string("Verification token is required").min(3),
+  }),
+};
+
 export default {
   registerSchema,
   loginSchema,
   resendVerificationSchema,
   refreshTokenSchema,
+  verifyEmailSchema,
 };

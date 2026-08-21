@@ -302,7 +302,7 @@ class AuthService {
         ipAddress: metadata.userIp,
       },
     });
-    return newRefreshToken;
+    return refreshToken;
   }
 
   async verifyEmail(token) {

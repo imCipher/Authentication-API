@@ -12,6 +12,12 @@ import finalConfig from "../../config/keys.js";
  * Service class for handling user-related business logic.
  */
 class AuthService {
+  /**
+   * Registers a new user in the system.
+   * @param {Object} userdata - The user data for registration.
+   * @returns {Promise<Object>} - The newly created user object.
+   * @throws {ApiError} - Throws an error if the username or email is already taken.
+   */
   async register(userdata) {
     const { fullName, username, email, password } = userdata;
 

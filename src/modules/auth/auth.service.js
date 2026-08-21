@@ -103,6 +103,12 @@ class AuthService {
 
     if (!(await hashUtils.comparePassword(user.passwordHash, password))) {
       failedAttemptsCount++;
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedAttempts: failedAttemptsCount },
+      });
+
       await prisma.loginHistory.create({
         data: {
           userId: user.id,
@@ -147,6 +153,10 @@ class AuthService {
 
     if (!user.emailVerified) {
       failedAttemptsCount++;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedAttempts: failedAttemptsCount },
+      });
       await prisma.loginHistory.create({
         data: {
           userId: user.id,

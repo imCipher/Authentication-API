@@ -278,6 +278,12 @@ class AuthService {
     return { accessToken, refreshToken: newRefreshToken.refreshToken };
   }
 
+  /**
+   * Retrieves a user by their ID and role.
+   * @param {string} userId - The ID of the user to retrieve.
+   * @param {string} role - The role of the user to retrieve.
+   * @returns {Promise<Object|null>} - The user object if found, otherwise null.
+   */
   async getUserById(userId, role) {
     const user = await prisma.user.findFirst({
       where: {

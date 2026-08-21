@@ -15,7 +15,6 @@ class AuthService {
   async register(userdata) {
     const { fullName, username, email, password } = userdata;
 
-
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [{ username }, { email }],
@@ -34,15 +33,11 @@ class AuthService {
     const start2Db = performance.now();
     const hashedPassword = await hashUtils.hashPassword(password);
     const end2Db = performance.now();
-    logger.info(
-      "Password hashing time: %d ms",
-      end2Db - start2Db,
-    );
+    logger.info("Password hashing time: %d ms", end2Db - start2Db);
 
     const token = tokenUtils.verificationToken(6);
     let hashToken = tokenUtils.hashToken(token);
     let expiryTime = tokenUtils.expiresAt(5);
-
 
     const user = await prisma.$transaction(async tx => {
       const newUser = await tx.user.create({
@@ -80,6 +75,130 @@ class AuthService {
     });
 
     return user;
+  }
+
+  async login(loginData, metadata) {
+    const { loginIdentifier, password } = loginData;
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: loginIdentifier }, { username: loginIdentifier }],
+      },
+      select: {
+        passwordHash: true,
+        id: true,
+        role: true,
+        status: true,
+        lockedUntil: true,
+        failedAttempts: true,
+        emailVerified: true,
+      },
+    });
+
+    let failedAttemptsCount = user ? user.failedAttempts : 0;
+
+    if (!user) {
+      await hashUtils.fakeComparePassword(); // Prevent timing attacks
+      throw ApiError.unauthorized("Invalid login credentials");
+    }
+
+    if (!(await hashUtils.comparePassword(user.passwordHash, password))) {
+      failedAttemptsCount++;
+      await prisma.loginHistory.create({
+        data: {
+          userId: user.id,
+          ipAddress: metadata.userIp,
+          userAgent: metadata.userAgent,
+          success: false,
+          reason: "Incorrect password.",
+        },
+      });
+      throw ApiError.unauthorized("Invalid login credentials");
+    }
+
+    if (user.status !== "ACTIVE") {
+      await prisma.loginHistory.create({
+        data: {
+          userId: user.id,
+          ipAddress: metadata.userIp,
+          userAgent: metadata.userAgent,
+          success: false,
+          reason: "Account has been deactivated.",
+        },
+      });
+      throw ApiError.unauthorized(
+        "User account has been deactivated. Please contact support for assistance.",
+      );
+    }
+
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      await prisma.loginHistory.create({
+        data: {
+          userId: user.id,
+          ipAddress: metadata.userIp,
+          userAgent: metadata.userAgent,
+          success: false,
+          reason: "Account locked due to multiple failed login attempts",
+        },
+      });
+      throw ApiError.unauthorized(
+        "Account is temporarily locked due to multiple failed login attempts.",
+      );
+    }
+
+    if (!user.emailVerified) {
+      failedAttemptsCount++;
+      await prisma.loginHistory.create({
+        data: {
+          userId: user.id,
+          ipAddress: metadata.userIp,
+          userAgent: metadata.userAgent,
+          success: false,
+          reason: "Email not verified.",
+        },
+      });
+      throw ApiError.unauthorized(
+        "Email is not verified. Please verify your email before logging in.",
+      );
+    }
+
+    if (failedAttemptsCount >= 5 && user.role !== "admin") {
+      const lockDuration = 15 * 60 * 1000; // 15 minutes
+      const lockedUntil = new Date(Date.now() + lockDuration);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lockedUntil, failedAttempts: 0 },
+      });
+      throw ApiError.unauthorized(
+        "Account is temporarily locked due to multiple failed login attempts. Please try again later.",
+      );
+    }
+
+    const accessToken = await this.generateAccessToken(user);
+    const refreshToken = await this.generateRefreshToken(user.id, metadata);
+
+    await prisma.$transaction(async tx => {
+      await tx.loginHistory.create({
+        data: {
+          userId: user.id,
+          ipAddress: metadata.userIp,
+          userAgent: metadata.userAgent,
+          success: true,
+          reason: "Login successful",
+        },
+      });
+
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          failedAttempts: 0,
+          lockedUntil: null,
+          lastLoginAt: new Date(),
+          lastLoginIp: metadata.userIp,
+        },
+      });
+    });
+
+    return { accessToken, refreshToken };
   }
 
   async rotateRefreshToken(refreshToken, { userIp, userAgent }) {
@@ -182,11 +301,8 @@ class AuthService {
         userAgent: metadata.userAgent,
         ipAddress: metadata.userIp,
       },
-      select: {
-        id: true,
-      },
     });
-    return { refreshToken, id: newRefreshToken.id };
+    return newRefreshToken;
   }
 
   async verifyEmail(token) {

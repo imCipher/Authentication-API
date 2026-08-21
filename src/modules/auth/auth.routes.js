@@ -27,17 +27,7 @@ router.post(
   "/login",
   loginRateLimiter,
   validateRequest(authSchema.loginSchema),
-  (req, res) => {
-    // Handle login logic here
-    if (
-      req.body.loginIdentifier === "testuser" &&
-      req.body.password === "password"
-    ) {
-      res.status(200).json({ message: "User logged in successfully" });
-    } else {
-      res.status(401).json({ message: "Invalid username or password" });
-    }
-  },
+  authController.login,
 );
 
 router.post(

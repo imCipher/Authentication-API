@@ -23,6 +23,27 @@ const register = CatchAsync(async (req, res, next) => {
   });
 });
 
+const login = CatchAsync(async (req, res, next) => {
+  const { loginIdentifier, password } = req.validated.body;
+  const metadata = getRequestMetadata(req);
+  const tokenPair = await AuthService.login(
+    {
+      loginIdentifier,
+      password,
+    },
+    metadata,
+  );
+
+  res.status(200).json({
+    status: true,
+    message: "Login successful.",
+    token: {
+      accessToken: tokenPair.accessToken,
+      refreshToken: tokenPair.refreshToken,
+    },
+  });
+});
+
 const refreshToken = CatchAsync(async (req, res, next) => {
   const { refreshToken } = req.validated.body;
   const { userIp, userAgent } = getRequestMetadata(req);
@@ -63,6 +84,7 @@ const resendVerification = CatchAsync(async (req, res, next) => {
 
 export default {
   register,
+  login,
   resendVerification,
   refreshToken,
   verifyEmail,

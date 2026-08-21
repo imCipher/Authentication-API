@@ -15,18 +15,11 @@ const register = CatchAsync(async (req, res, next) => {
     password,
   });
 
-  const accessToken = await AuthService.generateAccessToken(user);
-  const { refreshToken } = await AuthService.generateRefreshToken(
-    user.id,
-    getRequestMetadata(req),
-  );
-
   res.status(201).json({
     success: true,
     message:
       "Registration successful. Please check your email to verify your account.",
     data: { user },
-    tokens: { accessToken, refreshToken },
   });
 });
 
@@ -59,15 +52,8 @@ const verifyEmail = CatchAsync(async (req, res, next) => {
 });
 
 const resendVerification = CatchAsync(async (req, res, next) => {
-  const user = req.user; // Assuming the user is already authenticated and available in req.user
-  if (!user) {
-    return res.status(401).json({
-      success: false,
-      message: "User not authenticated.",
-    });
-  }
-  const metadata = getRequestMetadata(req);
-  await AuthService.resendVerificationEmail(user, metadata);
+  const { email } = req.validated.body;
+  await AuthService.resendVerificationEmail(email);
   res.status(200).json({
     success: true,
     message:

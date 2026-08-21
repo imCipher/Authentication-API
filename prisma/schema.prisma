@@ -66,6 +66,9 @@ model User {
   auditLogs          AuditLog[]
   oauthExchangeCodes  OauthExchangeCode[]
 
+  @@index([username])
+  @@index([id])
+  @@index([email])
   @@map("users")
 }
 

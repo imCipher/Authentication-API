@@ -43,7 +43,7 @@ router.post(
 router.post(
   "/resend-verification",
   emailVerificationRateLimiter,
-  protect,
+  validateRequest(authSchema.resendVerificationEmailSchema),
   authController.resendVerification,
 );
 

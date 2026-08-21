@@ -7,7 +7,6 @@ import hashUtils from "../../utils/hash.utils.js";
 import tokenUtils from "../../utils/token.utils.js";
 import Email from "../../Utils/email.utils.js";
 import finalConfig from "../../config/keys.js";
-import { access } from "fs";
 
 /**
  * Service class for handling user-related business logic.
@@ -15,6 +14,7 @@ import { access } from "fs";
 class AuthService {
   async register(userdata) {
     const { fullName, username, email, password } = userdata;
+
 
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -24,22 +24,25 @@ class AuthService {
 
     if (existingUser) {
       if (existingUser.username === username) {
-        throw ApiError.conflict("Username is already taken", {
-          code: "USERNAME_TAKEN",
-        });
+        throw ApiError.conflict("Username is already taken");
       }
       if (existingUser.email === email) {
-        throw ApiError.conflict("Email is already registered", {
-          code: "EMAIL_REGISTERED",
-        });
+        throw ApiError.conflict("Email is already registered");
       }
     }
 
+    const start2Db = performance.now();
     const hashedPassword = await hashUtils.hashPassword(password);
+    const end2Db = performance.now();
+    logger.info(
+      "Password hashing time: %d ms",
+      end2Db - start2Db,
+    );
 
     const token = tokenUtils.verificationToken(6);
     let hashToken = tokenUtils.hashToken(token);
     let expiryTime = tokenUtils.expiresAt(5);
+
 
     const user = await prisma.$transaction(async tx => {
       const newUser = await tx.user.create({
@@ -60,7 +63,7 @@ class AuthService {
         },
       });
 
-      if (newUser.emailVerified !== "true") {
+      if (!newUser.emailVerified) {
         await tx.emailVerification.create({
           data: {
             userId: newUser.id,
@@ -220,19 +223,28 @@ class AuthService {
     return true;
   }
 
-  async resendVerificationEmail(user) {
-    const email = user.email;
+  async resendVerificationEmail({ email }) {
     const token = tokenUtils.verificationToken(6);
     const hashedToken = tokenUtils.hashToken(token);
     const expiryTime = tokenUtils.expiresAt(5);
-    await prisma.$transaction(async tx => {
-      await tx.user.findFirst({
-        where: {
-          id: user.id,
-          emailVerified: false,
-        },
-      });
 
+    const user = await prisma.user.findFirst({
+      where: {
+        email,
+        emailVerified: false,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      throw ApiError.badRequest("User is already verified or does not exist");
+    }
+
+    await prisma.$transaction(async tx => {
       await tx.emailVerification.deleteMany({
         where: { userId: user.id },
       });

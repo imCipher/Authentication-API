@@ -160,7 +160,19 @@ const refreshTokenSchema = {
  */
 const verifyEmailSchema = {
   body: z.object({
-    token: z.string("Verification token is required").min(3),
+    token: z
+      .string("Verification token is required")
+      .min(6, "Verification token must be at least 6 characters long"),
+  }),
+};
+
+/**
+ * Validation schemas for resending verification email
+ * This schema ensures that the email is provided and meets the specified criteria.
+ */
+const resendVerificationEmailSchema = {
+  body: z.object({
+    email: emailSchema,
   }),
 };
 
@@ -168,6 +180,7 @@ export default {
   registerSchema,
   loginSchema,
   resendVerificationSchema,
+  resendVerificationEmailSchema,
   refreshTokenSchema,
   verifyEmailSchema,
 };

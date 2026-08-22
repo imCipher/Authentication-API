@@ -3,9 +3,11 @@ import helmet from "helmet";
 import morgan from "morgan";
 import passport from "passport";
 import cors from "cors";
+import swaggerUi from "swagger-ui-express";
 
 import morganLogger from "./config/morgan.js";
 import finalConfig from "./config/keys.js";
+import swaggerSpec from "./config/swagger.js";
 import { notFound, errorHandler } from "./middlewares/error.middleware.js";
 import { generalRateLimiter } from "./middlewares/rateLimiter.middleware.js";
 import healthRoutes from "./modules/health/health.routes.js";
@@ -41,6 +43,9 @@ const apiPrefix = `/api/${finalConfig.apiVersion}`;
 // Routes
 app.use(`${apiPrefix}/health`, healthRoutes);
 app.use(`${apiPrefix}/auth`, authRoutes);
+if (finalConfig.nodeEnv !== "production") {
+  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+}
 
 app.use(notFound);
 app.use(errorHandler);

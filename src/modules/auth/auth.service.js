@@ -172,7 +172,7 @@ class AuthService {
     if (!(await hashUtils.comparePassword(user.passwordHash, password))) {
       failedAttemptsCount++;
 
-      if (failedAttemptsCount >= 5 && user.role !== "admin") {
+      if (failedAttemptsCount >= 5 && user.role !== "ADMIN") {
         const lockDuration = 15 * 60 * 1000; // 15 minutes
         const lockedUntil = new Date(Date.now() + lockDuration);
         await prisma.user.update({
@@ -416,7 +416,7 @@ class AuthService {
    * @returns {Promise<void>} - A promise that resolves when the email is sent.
    * @throws {ApiError} - Throws a 400 bad request error if the user is already verified or does not exist.
    */
-  async resendVerificationEmail({ email }) {
+  async resendVerificationEmail(email) {
     const token = tokenUtils.verificationToken(6);
     const hashedToken = tokenUtils.hashToken(token);
     const expiryTime = tokenUtils.expiresAt(5);

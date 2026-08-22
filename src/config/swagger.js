@@ -1,5 +1,4 @@
 import swaggerJSDoc from "swagger-jsdoc";
-import ApiError from "../utils/ApiError";
 
 const options = {
   definition: {
@@ -23,85 +22,82 @@ const options = {
           scheme: "bearer",
           bearerFormat: "JWT",
         },
-        schemas: {
-          User: {
-            type: "object",
-            properties: {
-              id: {
-                type: "string",
-                format: "uuid",
-                example: "716676c0-0fc4-4d58-ae24-baf33d865e12",
-              },
-              fullName: { type: "string", example: "John Doe" },
-              username: { type: "string", example: "johndoe" },
-              email: {
-                type: "string",
-                format: "email",
-                example: "johndoe@example.com",
-              },
-              role: { type: "string", example: "USER" },
-              emailVerified: { type: "boolean", example: true },
-              createdAt: {
-                type: "string",
-                format: "date-time",
-                example: "2023-01-01T00:00:00Z",
-              },
+      },
+      schemas: {
+        User: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              format: "uuid",
+              example: "716676c0-0fc4-4d58-ae24-baf33d865e12",
+            },
+            fullName: { type: "string", example: "John Doe" },
+            username: { type: "string", example: "johndoe" },
+            email: {
+              type: "string",
+              format: "email",
+              example: "johndoe@example.com",
+            },
+            role: { type: "string", example: "USER" },
+            emailVerified: { type: "boolean", example: true },
+            createdAt: {
+              type: "string",
+              format: "date-time",
+              example: "2023-01-01T00:00:00Z",
             },
           },
-          TokenPair: {
-            type: "object",
-            properties: {
-              accessToken: {
-                type: "string",
-                example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-              },
-              refreshToken: {
-                type: "string",
-                example: "dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4gZXhhbXBsZQ==",
-              },
+        },
+        TokenPair: {
+          type: "object",
+          properties: {
+            accessToken: {
+              type: "string",
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            },
+            refreshToken: {
+              type: "string",
+              example: "dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4gZXhhbXBsZQ==",
             },
           },
-          ApiError: {
-            type: "object",
-            properties: {
-              success: { type: "boolean", example: false },
-              error: {
-                type: "object",
-                properties: {
-                  status: { type: "string", example: "fail" },
-                  code: { type: "string", example: "VALIDATION_ERROR" },
-                  message: {
-                    type: "string",
-                    example: "Validation failed for the request.",
-                  },
-                  errors: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        field: { type: "string", example: "email" },
-                        message: {
-                          type: "string",
-                          example:
-                            "Email is required and must be a valid email address.",
-                        },
+        },
+        ApiError: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: false },
+            error: {
+              type: "object",
+              properties: {
+                status: { type: "string", example: "fail" },
+                code: { type: "string", example: "VALIDATION_ERROR" },
+                message: {
+                  type: "string",
+                  example: "Validation failed for the request.",
+                },
+                errors: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      field: { type: "string", example: "email" },
+                      message: {
+                        type: "string",
+                        example:
+                          "Email is required and must be a valid email address.",
                       },
                     },
-                  },
-                  stack: {
-                    type: "Object",
                   },
                 },
               },
             },
           },
-          ApiSuccess: {
-            type: "object",
-            properties: {
-              success: { type: "boolean", example: true },
-              message: { type: "string", example: "Operation successful." },
-              data: { type: "object" },
-            },
+        },
+        ApiSuccess: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            message: { type: "string", example: "Operation successful." },
+            data: { type: "object" },
           },
         },
       },
@@ -113,4 +109,4 @@ const options = {
 
 const swaggerSpec = swaggerJSDoc(options);
 
-module.exports = swaggerSpec;
+export default swaggerSpec;

@@ -40,17 +40,6 @@ const login = CatchAsync(async (req, res, next) => {
       refreshToken: tokenPair.refreshToken,
     },
   });
-
-  /*
-  res.status(200).json({
-    status: true,
-    message: "Login successful.",
-    tokens: {
-      accessToken: tokenPair.accessToken,
-      refreshToken: tokenPair.refreshToken,
-    },
-  });
-  */
 });
 
 const refreshToken = CatchAsync(async (req, res, next) => {
@@ -68,17 +57,6 @@ const refreshToken = CatchAsync(async (req, res, next) => {
       refreshToken: token.refreshToken,
     },
   });
-
-  /*
-  res.status(200).json({
-    success: true,
-    message: "Token refreshed successfully.",
-    tokens: {
-      accessToken: token.accessToken,
-      refreshToken: token.refreshToken,
-    },
-  });
-  */
 });
 
 const verifyEmail = CatchAsync(async (req, res, next) => {
@@ -86,13 +64,6 @@ const verifyEmail = CatchAsync(async (req, res, next) => {
   await AuthService.verifyEmail(token);
 
   ApiResponse.success(res, "Email verified successfully.");
-
-  /*
-  res.status(200).json({
-    success: true,
-    message: "Email verified successfully.",
-  });
-  */
 });
 
 const resendVerification = CatchAsync(async (req, res, next) => {
@@ -103,15 +74,6 @@ const resendVerification = CatchAsync(async (req, res, next) => {
     res,
     "Email resent successfully. Please check your email to verify your account.",
   );
-
-  /*
-
-  res.status(200).json({
-    success: true,
-    message:
-      "Email resent successfully. Please check your email to verify your account.",
-  });
-  */
 });
 
 export default {

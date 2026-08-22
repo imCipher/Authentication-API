@@ -17,9 +17,12 @@ export const DEFAULT_CODES = {
 class ApiError extends Error {
   /**
    * Create an Operational error instance.
-   * @param {string} message - Error message to show to client
+   * @param {string} message - Error message to show to client.
    * @param {number} statusCode - HTTP status code (e.g. 400, 404).
+   * @param {Array} [errors] - Optional array of validation error messages.
+   * @param {Object} [options] - Optional additional error configuration.
    */
+
   constructor(message, statusCode, errors = undefined, options = {}) {
     super(message, options); // Error natively reads options.cause
 
@@ -42,7 +45,14 @@ class ApiError extends Error {
     Error.captureStackTrace(this, this.constructor);
   }
 
-  // To handle bad requests like validation errors
+  /**
+   * To handle 400 bad request errors, e.g., validation errors
+   *
+   * @param {string} message - Error message to show to client
+   * @param {Array} [errors] - Array of validation error messages
+   * @param {Object} [options] - Additional options for the error
+   * @returns {ApiError} - Returns an instance of ApiError
+   */
   static badRequest(message, errors = undefined, options = {}) {
     return new ApiError(message, 400, errors, {
       code: "VALIDATION_ERROR",
@@ -50,17 +60,36 @@ class ApiError extends Error {
     });
   }
 
-  // To handle unauthorized access errors
+  /**
+   * To handle 401 unauthorized access errors
+   *
+   * @param {string} message - Error message to show to client
+   * @param {Object} [options] - Additional options for the error
+   * @returns {ApiError} - Returns an instance of ApiError
+   */
   static unauthorized(message = "Unauthorized", options = {}) {
     return new ApiError(message, 401, undefined, options);
   }
 
-  // To handle forbidden access errors
+  /**
+   * To handle 403 forbidden access errors
+   *
+   * @param {string} message - Error message to show to client
+   * @param {Object} [options] - Additional options for the error
+   * @returns {ApiError} - Returns an instance of ApiError
+   */
+
   static forbidden(message = "Forbidden", options = {}) {
     return new ApiError(message, 403, undefined, options);
   }
 
-  // To handle not found errors
+  /**
+   * To handle 404 not found errors
+   *
+   * @param {string} message - Error message to show to client
+   * @param {Object} [options] - Additional options for the error
+   * @returns {ApiError} - Returns an instance of ApiError
+   */
   static notFound(message = "Resource Not Found", options = {}) {
     return new ApiError(message, 404, undefined, {
       code: "RESOURCE_NOT_FOUND",
@@ -68,12 +97,24 @@ class ApiError extends Error {
     });
   }
 
-  // To handle conflict errors, e.g., duplicate entries
+  /**
+   * To handle 409 conflict errors, e.g., duplicate entries
+   *
+   * @param {string} message - Error message to show to client
+   * @param {Object} [options] - Additional options for the error
+   * @returns {ApiError} - Returns an instance of ApiError
+   */
   static conflict(message, options = {}) {
     return new ApiError(message, 409, undefined, options);
   }
 
-  // To handle too many requests errors, e.g., rate limiting
+  /**
+   * To handle 429 too many requests errors, e.g., rate limiting
+   *
+   * @param {string} message - Error message to show to client
+   * @param {Object} [options] - Additional options for the error
+   * @returns {ApiError} - Returns an instance of ApiError
+   */
   static tooManyRequests(
     message = "Too Many Requests, Try again later",
     options = {},
@@ -81,7 +122,13 @@ class ApiError extends Error {
     return new ApiError(message, 429, undefined, options);
   }
 
-  // To handle internal server errors
+  /**
+   * To handle 500 internal server errors
+   *
+   * @param {string} message - Error message to show to client
+   * @param {Object} [options] - Additional options for the error
+   * @returns {ApiError} - Returns an instance of ApiError
+   */
   static internal(message = "Internal Server Error", options = {}) {
     return new ApiError(message, 500, undefined, options);
   }

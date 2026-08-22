@@ -1,5 +1,6 @@
 import CatchAsync from "../../Utils/CatchAsync.js";
 import AuthService from "./auth.service.js";
+import ApiResponse from "../../Utils/ApiResponse.js";
 
 const getRequestMetadata = req => ({
   userIp: req.ip || req.connection?.remoteAddress,
@@ -15,12 +16,11 @@ const register = CatchAsync(async (req, res, next) => {
     password,
   });
 
-  res.status(201).json({
-    success: true,
-    message:
-      "Registration successful. Please check your email to verify your account.",
-    data: { user },
-  });
+  ApiResponse.created(
+    res,
+    "Registration successful. Please check your email to verify your account.",
+    { user },
+  );
 });
 
 const login = CatchAsync(async (req, res, next) => {
@@ -34,14 +34,23 @@ const login = CatchAsync(async (req, res, next) => {
     metadata,
   );
 
-  res.status(200).json({
-    status: true,
-    message: "Login successful.",
-    token: {
+  ApiResponse.success(res, "Login Successful.", null, {
+    tokens: {
       accessToken: tokenPair.accessToken,
       refreshToken: tokenPair.refreshToken,
     },
   });
+
+  /*
+  res.status(200).json({
+    status: true,
+    message: "Login successful.",
+    tokens: {
+      accessToken: tokenPair.accessToken,
+      refreshToken: tokenPair.refreshToken,
+    },
+  });
+  */
 });
 
 const refreshToken = CatchAsync(async (req, res, next) => {
@@ -53,6 +62,14 @@ const refreshToken = CatchAsync(async (req, res, next) => {
     userAgent,
   });
 
+  ApiResponse.success(res, "Token refreshed successfully.", null, {
+    tokens: {
+      accessToken: token.accessToken,
+      refreshToken: token.refreshToken,
+    },
+  });
+
+  /*
   res.status(200).json({
     success: true,
     message: "Token refreshed successfully.",
@@ -61,25 +78,40 @@ const refreshToken = CatchAsync(async (req, res, next) => {
       refreshToken: token.refreshToken,
     },
   });
+  */
 });
 
 const verifyEmail = CatchAsync(async (req, res, next) => {
   const { token } = req.validated.body;
   await AuthService.verifyEmail(token);
+
+  ApiResponse.success(res, "Email verified successfully.");
+
+  /*
   res.status(200).json({
     success: true,
     message: "Email verified successfully.",
   });
+  */
 });
 
 const resendVerification = CatchAsync(async (req, res, next) => {
   const { email } = req.validated.body;
   await AuthService.resendVerificationEmail(email);
+
+  ApiResponse.success(
+    res,
+    "Email resent successfully. Please check your email to verify your account.",
+  );
+
+  /*
+
   res.status(200).json({
     success: true,
     message:
       "Email resent successfully. Please check your email to verify your account.",
   });
+  */
 });
 
 export default {

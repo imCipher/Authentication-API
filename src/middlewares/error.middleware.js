@@ -3,7 +3,10 @@ import logger from "../config/logger.js";
 import finalConfig from "../config/keys.js";
 
 /**
- * 404 Handler - catched unmatched routes
+ * Middleware to handle 404 Not Found errors for undefined routes.
+ * It creates an ApiError instance with a 404 status code and passes it to the next middleware.
+ * This middleware should be placed after all route definitions to catch any requests
+ * that do not match existing routes.
  */
 export const notFound = (req, res, next) => {
   next(

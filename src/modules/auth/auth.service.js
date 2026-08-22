@@ -411,8 +411,7 @@ class AuthService {
   /**
    * Resends the email verification token to a user who has not yet verified their email.
    *
-   * @param {Object} params - The parameters for resending the verification email.
-   * @param {string} params.email - The email address of the user.
+   * @param {string} email - The email address of the user.
    * @returns {Promise<void>} - A promise that resolves when the email is sent.
    * @throws {ApiError} - Throws a 400 bad request error if the user is already verified or does not exist.
    */

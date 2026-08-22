@@ -61,7 +61,7 @@ const options = {
             },
           },
         },
-        ApiError: {
+        ApiValidationError: {
           type: "object",
           properties: {
             success: { type: "boolean", example: false },
@@ -87,6 +87,24 @@ const options = {
                       },
                     },
                   },
+                },
+              },
+            },
+          },
+        },
+        ApiError: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: false },
+            error: {
+              type: "object",
+              properties: {
+                status: { type: "string", example: "fail" },
+                code: { type: "string", example: "RATE_LIMITED" },
+                message: {
+                  type: "string",
+                  example:
+                    "Too many requests from this IP, please try again later.",
                 },
               },
             },

@@ -16,6 +16,63 @@ const router = Router();
 
 router.use(authRateLimiter); // Apply general auth rate limiter to all routes in this router
 
+/**
+ * @swagger
+ * tags:
+ *    name: Authentication
+ *    description: Endpoints for user authentication and authorization.
+ */
+
+/**
+ * @swagger
+ * /auth/register:
+ *   post:
+ *    summary: Register a new user.
+ *    tags: [Authentication]
+ *    security: []
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required: [fullName, username, email, password, confirmPassword]
+ *            properties:
+ *              fullName:
+ *                type: string
+ *                example: John Doe
+ *              username:
+ *                type: string
+ *                example: johndoe
+ *              email:
+ *                type: string
+ *                example: johndoe@example.com
+ *              password:
+ *                type: string
+ *                example: SecureP@ss1
+ *              confirmPassword:
+ *                type: string
+ *                example: SecureP@ss1
+ *    responses:
+ *      201:
+ *        description: Registration successful. Please check your email to verify your account.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiSuccess'
+ *      400:
+ *        description: Bad request. Please check your input.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiValidationError'
+ *      409:
+ *        description: Conflict. Email or username already exists.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ */
 router.post(
   "/register",
   registerRateLimiter,

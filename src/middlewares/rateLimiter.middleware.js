@@ -24,6 +24,7 @@ import ApiError from "../Utils/ApiError.js";
  * @param {string} config.storePrefix - Redis key prefix (e.g. "rl:register:")
  * @param {number} config.windowMs - Window size in milliseconds
  * @param {number} config.max - Max requests per window per IP
+ * @param {boolean} [config.skipSuccessfulRequests=false] - Whether to skip counting successful requests (e.g. for login)
  * @param {string} config.label - Human-readable name used in logs
  * @param {string} config.message - Message returned to the client on 429
  * @returns {Function} Express middleware

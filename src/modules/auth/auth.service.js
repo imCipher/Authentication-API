@@ -107,26 +107,6 @@ class AuthService {
       throw ApiError.unauthorized("Invalid login credentials");
     }
 
-    if (!(await hashUtils.comparePassword(user.passwordHash, password))) {
-      failedAttemptsCount++;
-
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { failedAttempts: failedAttemptsCount },
-      });
-
-      await prisma.loginHistory.create({
-        data: {
-          userId: user.id,
-          ipAddress: metadata.userIp,
-          userAgent: metadata.userAgent,
-          success: false,
-          reason: "Incorrect password.",
-        },
-      });
-      throw ApiError.unauthorized("Invalid login credentials");
-    }
-
     if (user.status !== "ACTIVE") {
       await prisma.loginHistory.create({
         data: {
@@ -158,11 +138,6 @@ class AuthService {
     }
 
     if (!user.emailVerified) {
-      failedAttemptsCount++;
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { failedAttempts: failedAttemptsCount },
-      });
       await prisma.loginHistory.create({
         data: {
           userId: user.id,
@@ -177,7 +152,10 @@ class AuthService {
       );
     }
 
-    if (failedAttemptsCount >= 5 && user.role !== "admin") {
+    if (!(await hashUtils.comparePassword(user.passwordHash, password))) {
+      failedAttemptsCount++;
+
+      if (failedAttemptsCount >= 5 && user.role !== "admin") {
       const lockDuration = 15 * 60 * 1000; // 15 minutes
       const lockedUntil = new Date(Date.now() + lockDuration);
       await prisma.user.update({
@@ -187,6 +165,22 @@ class AuthService {
       throw ApiError.unauthorized(
         "Account is temporarily locked due to multiple failed login attempts. Please try again later.",
       );
+    }
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedAttempts: failedAttemptsCount },
+      });
+
+      await prisma.loginHistory.create({
+        data: {
+          userId: user.id,
+          ipAddress: metadata.userIp,
+          userAgent: metadata.userAgent,
+          success: false,
+          reason: "Incorrect password.",
+        },
+      });
+      throw ApiError.unauthorized("Invalid login credentials");
     }
 
     const accessToken = await this.generateAccessToken(user);

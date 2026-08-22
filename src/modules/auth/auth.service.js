@@ -201,7 +201,7 @@ class AuthService {
     }
 
     const accessToken = await this.generateAccessToken(user);
-    const refreshToken = await this.generateRefreshToken(user.id, metadata);
+    const { refreshToken } = await this.generateRefreshToken(user.id, metadata);
 
     await prisma.$transaction(async tx => {
       await tx.loginHistory.create({
@@ -346,7 +346,7 @@ class AuthService {
    * @param {Object} metadata - Metadata containing user IP and user agent.
    * @param {string} metadata.userIp - The IP address of the user.
    * @param {string} metadata.userAgent - The user agent string of the user's device.
-   * @returns {Promise<string>} - The generated refresh token.
+   * @returns {Promise<{refreshToken: string, id: string}>} - The generated refresh token string and id.
    * @throws {ApiError} - Throws an error if the refresh token cannot be generated or stored.
    */
   async generateRefreshToken(userId, metadata) {
@@ -364,7 +364,7 @@ class AuthService {
         ipAddress: metadata.userIp,
       },
     });
-    return refreshToken;
+    return { refreshToken, id: newRefreshToken.id };
   }
 
   /**

@@ -14,9 +14,14 @@ import finalConfig from "../../config/keys.js";
 class AuthService {
   /**
    * Registers a new user in the system.
+   *
    * @param {Object} userdata - The user data for registration.
-   * @returns {Promise<Object>} - The newly created user object.
-   * @throws {ApiError} - Throws an error if the username or email is already taken.
+   * @param {string} userdata.fullName - The full name of the user.
+   * @param {string} userdata.username - The desired username of the user.
+   * @param {string} userdata.email - The email address of the user.
+   * @param {string} userdata.password - The plaintext password of the user.
+   * @returns {Promise<Object>} - The newly created user object (excluding sensitive data like passwordHash).
+   * @throws {ApiError} - Throws a 409 conflict error if the username or email is already taken.
    */
   async register(userdata) {
     const { fullName, username, email, password } = userdata;
@@ -83,6 +88,18 @@ class AuthService {
     return user;
   }
 
+  /**
+   * Logs in a user by verifying their credentials and generating access and refresh tokens.
+   *
+   * @param {Object} loginData - The login data containing the login identifier and password.
+   * @param {string} loginData.loginIdentifier - The email or username of the user.
+   * @param {string} loginData.password - The plaintext password of the user.
+   * @param {Object} metadata - Metadata containing user IP and user agent.
+   * @param {string} metadata.userIp - The IP address of the user.
+   * @param {string} metadata.userAgent - The user agent string of the user's device.
+   * @returns {Promise<Object>} - An object containing the access token and refresh token.
+   * @throws {ApiError} - Throws an error if the login credentials are invalid or if the account is locked or deactivated.
+   */
   async login(loginData, metadata) {
     const { loginIdentifier, password } = loginData;
     const user = await prisma.user.findFirst({
@@ -156,16 +173,16 @@ class AuthService {
       failedAttemptsCount++;
 
       if (failedAttemptsCount >= 5 && user.role !== "admin") {
-      const lockDuration = 15 * 60 * 1000; // 15 minutes
-      const lockedUntil = new Date(Date.now() + lockDuration);
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { lockedUntil, failedAttempts: 0 },
-      });
-      throw ApiError.unauthorized(
-        "Account is temporarily locked due to multiple failed login attempts. Please try again later.",
-      );
-    }
+        const lockDuration = 15 * 60 * 1000; // 15 minutes
+        const lockedUntil = new Date(Date.now() + lockDuration);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { lockedUntil, failedAttempts: 0 },
+        });
+        throw ApiError.unauthorized(
+          "Account is temporarily locked due to multiple failed login attempts. Please try again later.",
+        );
+      }
       await prisma.user.update({
         where: { id: user.id },
         data: { failedAttempts: failedAttemptsCount },
@@ -211,6 +228,16 @@ class AuthService {
     return { accessToken, refreshToken };
   }
 
+  /**
+   * Revokes the current refresh token and issues a new access token and refresh token.
+   *
+   * @param {string} refreshToken - The current refresh token to be rotated.
+   * @param {Object} metadata - Metadata containing user IP and user agent.
+   * @param {string} metadata.userIp - The IP address of the user.
+   * @param {string} metadata.userAgent - The user agent string of the user's device.
+   * @returns {Promise<Object>} - An object containing the new access token and refresh token.
+   * @throws {ApiError} - Throws a 401 unauthorized error if the refresh token is invalid, expired, or has been revoked.
+   */
   async rotateRefreshToken(refreshToken, { userIp, userAgent }) {
     const hashedToken = tokenUtils.hashToken(refreshToken);
     const tokenInfo = await prisma.refreshToken.findFirst({
@@ -274,6 +301,7 @@ class AuthService {
 
   /**
    * Retrieves a user by their ID and role.
+   *
    * @param {string} userId - The ID of the user to retrieve.
    * @param {string} role - The role of the user to retrieve.
    * @returns {Promise<Object|null>} - The user object if found, otherwise null.
@@ -298,11 +326,29 @@ class AuthService {
     return user;
   }
 
+  /**
+   * Generates an access token for a user based on their ID and role.
+   *
+   * @param {Object} user - The user object containing the user's ID and role.
+   * @param {string} user.id - The ID of the user.
+   * @param {string} user.role - The role of the user.
+   * @returns {Promise<string>} - The generated access token.
+   */
   async generateAccessToken({ id, role }) {
     const accessToken = await tokenUtils.signAccessToken({ id, role });
     return accessToken;
   }
 
+  /**
+   * Generates a refresh token for a user and stores it in the database.
+   *
+   * @param {string} userId - The ID of the user for whom the refresh token is generated.
+   * @param {Object} metadata - Metadata containing user IP and user agent.
+   * @param {string} metadata.userIp - The IP address of the user.
+   * @param {string} metadata.userAgent - The user agent string of the user's device.
+   * @returns {Promise<string>} - The generated refresh token.
+   * @throws {ApiError} - Throws an error if the refresh token cannot be generated or stored.
+   */
   async generateRefreshToken(userId, metadata) {
     const daysUntilExpiry = finalConfig.jwt.refreshExpiresIn;
     const refreshToken = await tokenUtils.signRefreshToken();
@@ -321,6 +367,13 @@ class AuthService {
     return refreshToken;
   }
 
+  /**
+   * Verifies an email verification token and marks the user's email as verified.
+   *
+   * @param {string} token - The email verification token to verify.
+   * @returns {Promise<boolean>} - Returns true if the email verification is successful.
+   * @throws {ApiError} - Throws a 400 bad request error if the token is invalid or has expired.
+   */
   async verifyEmail(token) {
     const hashedToken = tokenUtils.hashToken(token);
     const verificationRecord = await prisma.emailVerification.findFirst({
@@ -355,6 +408,14 @@ class AuthService {
     return true;
   }
 
+  /**
+   * Resends the email verification token to a user who has not yet verified their email.
+   *
+   * @param {Object} params - The parameters for resending the verification email.
+   * @param {string} params.email - The email address of the user.
+   * @returns {Promise<void>} - A promise that resolves when the email is sent.
+   * @throws {ApiError} - Throws a 400 bad request error if the user is already verified or does not exist.
+   */
   async resendVerificationEmail({ email }) {
     const token = tokenUtils.verificationToken(6);
     const hashedToken = tokenUtils.hashToken(token);

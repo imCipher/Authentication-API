@@ -59,7 +59,12 @@ router.use(authRateLimiter); // Apply general auth rate limiter to all routes in
  *        content:
  *          application/json:
  *            schema:
- *              $ref: '#/components/schemas/ApiSuccess'
+ *              allOf:
+ *                - $ref: '#/components/schemas/ApiSuccess'
+ *                - type: object
+ *                  properties:
+ *                    data:
+ *                      $ref: '#/components/schemas/User'
  *      400:
  *        description: Bad request. Please check your input.
  *        content:

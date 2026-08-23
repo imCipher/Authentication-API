@@ -156,6 +156,50 @@ router.post(
   authController.login,
 );
 
+/**
+ * @swagger
+ * /auth/resend-verification:
+ *   post:
+ *    summary: Resend Email Verification Token to unverified User
+ *    tags: [Authentication]
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required: [email]
+ *            properties:
+ *              email:
+ *                type: string
+ *                  example: johndoe@example.com:
+ *    responses:
+ *      200:
+ *        description: Email Sent Successfully
+ *        content:
+ *          application/json:
+ *            schema:
+ *              type: object
+ *              properties:
+ *                success:
+ *                  type: boolean
+ *                  example: true
+ *                message:
+ *                  type: string
+ *                  example: Email resent successfully. Please check your email to verify your account.
+ *      400:
+ *        description: Bad request. Please check your input.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiValidationError'
+ *      429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ */
 router.post(
   "/resend-verification",
   emailVerificationRateLimiter,
@@ -163,6 +207,45 @@ router.post(
   authController.resendVerification,
 );
 
+/**
+ * @swagger
+ * /auth/verify-email:
+ *   post:
+ *    summary: Verifying Email with the token sent to the user's email address.
+ *    description: This endpoint allows users to verify their email address by providing the verification token they received via email. The token is typically sent to the user's email after registration or when requesting a new verification email.
+ *    security: []
+ *    tags: [Authentication]
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required: [token]
+ *            properties:
+ *              token:
+ *                type: string
+ *                  example: 123456:
+ *    responses:
+ *      200:
+ *        description: Email verified successfully.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiSuccess'
+ *      400:
+ *        description: Bad request or invalid token.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiValidationError'
+ *      429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ */
 router.post(
   "/verify-email",
   emailVerificationRateLimiter,
@@ -170,6 +253,49 @@ router.post(
   authController.verifyEmail,
 );
 
+/**
+ * @swagger
+ * /auth/refresh-token:
+ *   post:
+ *    summary: Rotate refresh token
+ *    tags: [Authentication]
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required: [refreshToken]
+ *            properties:
+ *              refreshToken:
+ *                type: string
+ *                  example: 583nd0jn29jmdin9fnino28:
+ *    responses:
+ *      200:
+ *        description: Token Refreshed Successfully
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiSuccess'
+ *      400:
+ *        description: Bad request. Please check your input.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiValidationError'
+ *      401:
+ *        description: Unauthorized. Please provide valid credentials.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ *      429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ */
 router.post(
   "/refresh-token",
   validateRequest(authSchema.refreshTokenSchema),

@@ -1,4 +1,4 @@
-import CatchAsync from "../../Utils/CatchAsync.js";
+import CatchAsync from "../../Utils/catchasync.js";
 import AuthService from "./auth.service.js";
 import ApiResponse from "../../Utils/ApiResponse.js";
 
@@ -34,7 +34,7 @@ const login = CatchAsync(async (req, res, next) => {
     metadata,
   );
 
-  ApiResponse.success(res, "Login Successful.", null, {
+  ApiResponse.success(res, "Login Successful.", {
     tokens: {
       accessToken: tokenPair.accessToken,
       refreshToken: tokenPair.refreshToken,

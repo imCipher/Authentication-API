@@ -1,7 +1,7 @@
 import tokenUtils from "../utils/token.utils.js";
 import ApiError from "../utils/ApiError.js";
 import authService from "../modules/auth/auth.service.js";
-import CatchAsync from "../utils/CatchAsync.js";
+import CatchAsync from "../utils/catchasync.js";
 
 /**
  * Middleware to protect routes and ensure that the user is authenticated.

@@ -64,7 +64,10 @@ router.use(authRateLimiter); // Apply general auth rate limiter to all routes in
  *                - type: object
  *                  properties:
  *                    data:
- *                      $ref: '#/components/schemas/User'
+ *                      type: object
+ *                      properties:
+ *                        user:
+ *                          $ref: '#/components/schemas/User'
  *      400:
  *        description: Bad request. Please check your input.
  *        content:
@@ -77,6 +80,12 @@ router.use(authRateLimiter); // Apply general auth rate limiter to all routes in
  *          application/json:
  *            schema:
  *              $ref: '#/components/schemas/ApiError'
+ *      429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
  */
 router.post(
   "/register",
@@ -85,6 +94,61 @@ router.post(
   authController.register,
 );
 
+/**
+ * @swagger
+ * /auth/login:
+ *  post:
+ *    summary: Login with LoginIdentifier (email or username) and password.
+ *    tags: [Authentication]
+ *    security: []
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required: [loginIdentifier, password]
+ *            properties:
+ *              loginIdentifier:
+ *                type: string
+ *                example: johndoe or johndoe@example.com
+ *              password:
+ *                type: string
+ *                example: SecureP@ss1
+ *    responses:
+ *      200:
+ *        description: Login successful. Returns access and refresh tokens.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              allOf:
+ *                - $ref: '#/components/schemas/ApiSuccess'
+ *                - type: object
+ *                  properties:
+ *                    data:
+ *                      type: object
+ *                      properties:
+ *                        tokens:
+ *                          $ref: '#/components/schemas/AuthTokens'
+ *      400:
+ *        description: Bad request. Please check your input.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiValidationError'
+ *     401:
+ *        description: Unauthorized. Invalid credentials.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ *     429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ */
 router.post(
   "/login",
   loginRateLimiter,

@@ -8,6 +8,14 @@ import finalConfig from "../config/keys.js";
  * Class representing an email utility for sending emails.
  */
 class Email {
+  /**
+   * Creates an instance of the Email class.
+   *
+   * @param {Object} user  - The user object containing user details.
+   * @param {string} user.email - The email address of the user.
+   * @param {string} user.fullName - The full name of the user.
+   * @param {string} code - The verification or reset code to be sent in the email.
+   */
   constructor(user, code) {
     this.to = user.email;
     this.firstName = user.fullName.split(" ")[0];
@@ -64,6 +72,11 @@ class Email {
   // Sends an email confirmation for user registration.
   async sendEmailConfirmation() {
     await this.send("register", "Confirm your email address");
+  }
+
+  // Sends a password reset email.
+  async sendPasswordReset() {
+    await this.send("resetpassword", "Reset your password");
   }
 }
 

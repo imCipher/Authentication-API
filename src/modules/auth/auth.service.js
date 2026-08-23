@@ -5,7 +5,7 @@ import logger from "../../config/logger.js";
 import ApiError from "../../utils/ApiError.js";
 import hashUtils from "../../utils/hash.utils.js";
 import tokenUtils from "../../utils/token.utils.js";
-import Email from "../../Utils/email.utils.js";
+import Email from "../../utils/email.utils.js";
 import finalConfig from "../../config/keys.js";
 
 /**
@@ -413,7 +413,6 @@ class AuthService {
    *
    * @param {string} email - The email address of the user.
    * @returns {Promise<void>} - A promise that resolves when the email is sent.
-   * @throws {ApiError} - Throws a 400 bad request error if the user is already verified or does not exist.
    */
   async resendVerificationEmail(email) {
     const token = tokenUtils.verificationToken(6);
@@ -433,7 +432,7 @@ class AuthService {
     });
 
     if (!user) {
-      throw ApiError.badRequest("User is already verified or does not exist");
+      return; // If user is not found or already verified, do nothing
     }
 
     await prisma.$transaction(async tx => {
@@ -451,6 +450,50 @@ class AuthService {
 
     new Email(user, token).sendEmailConfirmation().catch(error => {
       logger.warn("Email sending failed", { email, error });
+    });
+  }
+
+  /**
+   * Sends a password reset email to a user who has requested to reset their password.
+   *
+   * @param {string} email - The email address of the user requesting a password reset.
+   * @returns {Promise<void>} - A promise that resolves when the password reset email is sent.
+   */
+  async sendPasswordResetEmail(email) {
+    const token = tokenUtils.verificationToken(6);
+    const hashedToken = tokenUtils.hashToken(token);
+    const expiryTime = tokenUtils.expiresAt(5);
+
+    const user = await prisma.user.findFirst({
+      where: {
+        email,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      return; // Silently return if the user does not exist to prevent email enumeration
+    }
+
+    await prisma.$transaction(async tx => {
+      await tx.passwordReset.deleteMany({
+        where: { userId: user.id },
+      });
+      await tx.passwordReset.create({
+        data: {
+          userId: user.id,
+          tokenHash: hashedToken,
+          expiresAt: expiryTime,
+        },
+      });
+    });
+
+    new Email(user, token).sendPasswordReset().catch(error => {
+      logger.warn("Password reset email sending failed", { email, error });
     });
   }
 }

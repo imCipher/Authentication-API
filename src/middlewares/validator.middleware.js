@@ -1,4 +1,4 @@
-import ApiError from "../Utils/ApiError.js";
+import ApiError from "../utils/ApiError.js";
 
 /**
  * The accepted request sources for validation.

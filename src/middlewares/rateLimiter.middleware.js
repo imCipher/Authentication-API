@@ -4,7 +4,7 @@ import RedisStore from "rate-limit-redis";
 import logger from "../config/logger.js";
 import redisService from "../config/redis.js";
 import finalConfig from "../config/keys.js";
-import ApiError from "../Utils/ApiError.js";
+import ApiError from "../utils/ApiError.js";
 
 /**
  * Rate limiter factory with Redis-backed and in-memory limiters.

@@ -28,6 +28,7 @@ router.use(authRateLimiter); // Apply general auth rate limiter to all routes in
  * /auth/register:
  *   post:
  *    summary: Register a new user.
+ *    description: This endpoint allows new users to register by providing their full name, username, email, password, and confirm password. Upon successful registration, a verification email will be sent to the provided email address.
  *    tags: [Authentication]
  *    security: []
  *    requestBody:
@@ -40,19 +41,19 @@ router.use(authRateLimiter); // Apply general auth rate limiter to all routes in
  *            properties:
  *              fullName:
  *                type: string
- *                example: John Doe
+ *                example: "John Doe"
  *              username:
  *                type: string
- *                example: johndoe
+ *                example: "johndoe"
  *              email:
  *                type: string
- *                example: johndoe@example.com
+ *                example: "johndoe@example.com"
  *              password:
  *                type: string
- *                example: SecureP@ss1
+ *                example: "SecureP@ss1"
  *              confirmPassword:
  *                type: string
- *                example: SecureP@ss1
+ *                example: "SecureP@ss1"
  *    responses:
  *      201:
  *        description: Registration successful. Please check your email to verify your account.
@@ -99,6 +100,7 @@ router.post(
  * /auth/login:
  *  post:
  *    summary: Login with LoginIdentifier (email or username) and password.
+ *    description: This endpoint allows users to log in using either their registered email address or username along with their password. Upon successful authentication, the user will receive an access token and a refresh token for session management.
  *    tags: [Authentication]
  *    security: []
  *    requestBody:
@@ -111,10 +113,10 @@ router.post(
  *            properties:
  *              loginIdentifier:
  *                type: string
- *                example: johndoe or johndoe@example.com
+ *                example: "johndoe or johndoe@example.com"
  *              password:
  *                type: string
- *                example: SecureP@ss1
+ *                example: "SecureP@ss1"
  *    responses:
  *      200:
  *        description: Login successful. Returns access and refresh tokens.
@@ -129,20 +131,20 @@ router.post(
  *                      type: object
  *                      properties:
  *                        tokens:
- *                          $ref: '#/components/schemas/AuthTokens'
+ *                          $ref: '#/components/schemas/TokenPair'
  *      400:
  *        description: Bad request. Please check your input.
  *        content:
  *          application/json:
  *            schema:
  *              $ref: '#/components/schemas/ApiValidationError'
- *     401:
+ *      401:
  *        description: Unauthorized. Invalid credentials.
  *        content:
  *          application/json:
  *            schema:
  *              $ref: '#/components/schemas/ApiError'
- *     429:
+ *      429:
  *        description: Too many requests. Please try again later.
  *        content:
  *          application/json:
@@ -160,7 +162,9 @@ router.post(
  * @swagger
  * /auth/resend-verification:
  *   post:
- *    summary: Resend Email Verification Token to unverified User
+ *    summary: Resend verification email to the user.
+ *    description: This endpoint allows users to request a new verification email if they haven't received the original one or if it has expired. The user must provide their registered email address to receive the verification email.
+ *    security: []
  *    tags: [Authentication]
  *    requestBody:
  *      required: true
@@ -172,7 +176,7 @@ router.post(
  *            properties:
  *              email:
  *                type: string
- *                  example: johndoe@example.com:
+ *                example: "johndoe@example.com"
  *    responses:
  *      200:
  *        description: Email Sent Successfully
@@ -225,7 +229,7 @@ router.post(
  *            properties:
  *              token:
  *                type: string
- *                  example: 123456:
+ *                example: "123456"
  *    responses:
  *      200:
  *        description: Email verified successfully.
@@ -257,7 +261,9 @@ router.post(
  * @swagger
  * /auth/refresh-token:
  *   post:
- *    summary: Rotate refresh token
+ *    summary: Refresh Access Token using Refresh Token
+ *    description: This endpoint allows users to obtain a new access token by providing a valid refresh token. The refresh token is typically issued during the login process and can be used to maintain user sessions without requiring them to log in again.
+ *    security: []
  *    tags: [Authentication]
  *    requestBody:
  *      required: true
@@ -269,7 +275,7 @@ router.post(
  *            properties:
  *              refreshToken:
  *                type: string
- *                  example: 583nd0jn29jmdin9fnino28:
+ *                example: "583nd0jn29jmdin9fnino28"
  *    responses:
  *      200:
  *        description: Token Refreshed Successfully
@@ -300,6 +306,13 @@ router.post(
   "/refresh-token",
   validateRequest(authSchema.refreshTokenSchema),
   authController.refreshToken,
+);
+
+router.post(
+  "/forgot-password",
+  emailVerificationRateLimiter,
+  validateRequest(authSchema.verifyEmailSchema),
+  authController.forgotPassword,
 );
 
 export default router;

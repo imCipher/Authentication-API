@@ -384,7 +384,7 @@ class AuthService {
     });
 
     if (!verificationRecord) {
-      throw ApiError.badRequest("Token is invalid or  has expired", {
+      throw ApiError.badRequest("Token is invalid or  has expired", undefined, {
         code: "TOKEN_INVALID",
       });
     }
@@ -519,7 +519,7 @@ class AuthService {
     });
 
     if (!resetRecord || resetRecord.usedAt) {
-      throw ApiError.badRequest("Token is invalid or has expired", {
+      throw ApiError.badRequest("Token is invalid or has expired", undefined, {
         code: "TOKEN_INVALID",
       });
     }
@@ -547,7 +547,7 @@ class AuthService {
         });
 
         if (claimed.count === 0) {
-          throw ApiError.badRequest("Token is invalid or has expired", {
+          throw ApiError.badRequest("Token is invalid or has expired", undefined, {
             code: "TOKEN_INVALID",
           });
         }
@@ -558,14 +558,15 @@ class AuthService {
         });
       });
     } catch (error) {
-      logger.error("Error resetting password", { error });
+      if(error instanceof ApiError) throw error; // Re-throw if it's an ApiError
+      logger.error("Error resetting password", { cause: error });
       if (error?.code === "P2025") {
         throw ApiError.unauthorized("User not found or deactivated", {
           code: "USER_NOT_FOUND",
-          error,
+          cause: error,
         });
       }
-      throw error;
+      throw error; // Re-throw other unexpected errors
     }
   }
 }

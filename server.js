@@ -65,6 +65,7 @@ const startServer = async () => {
         // Disconnect Redis
         await redisService.disconnect();
 
+        // Exit the process
         process.exit(0);
       });
 

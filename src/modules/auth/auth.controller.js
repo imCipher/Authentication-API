@@ -121,6 +121,18 @@ const forgotPassword = CatchAsync(async (req, res, next) => {
   );
 });
 
+/**
+ * @route POST /api/v1/auth/reset-password
+ * @desc Reset a user's password using a token sent to their email
+ * @access Public
+ */
+const resetPassword = CatchAsync(async (req, res, next) => {
+  const { token, newPassword } = req.validated.body;
+  await AuthService.resetPassword(token, newPassword);
+
+  ApiResponse.success(res, "Password reset successfully.");
+});
+
 export default {
   register,
   login,
@@ -128,4 +140,5 @@ export default {
   refreshToken,
   verifyEmail,
   forgotPassword,
+  resetPassword,
 };

@@ -460,7 +460,7 @@ class AuthService {
    * @returns {Promise<void>} - A promise that resolves when the password reset email is sent.
    */
   async sendPasswordResetEmail(email) {
-    const token = tokenUtils.verificationToken(6);
+    const token = tokenUtils.secureToken();
     const hashedToken = tokenUtils.hashToken(token);
     const expiryTime = tokenUtils.expiresAt(5);
 
@@ -492,9 +492,81 @@ class AuthService {
       });
     });
 
-    new Email(user, token).sendPasswordReset().catch(error => {
+    new Email(user).sendPasswordReset(token).catch(error => {
       logger.warn("Password reset email sending failed", { email, error });
     });
+  }
+
+  /**
+   * Resets a user's password using a verification token.
+   *
+   * @param {string} token - The verification token for the password reset.
+   * @param {string} newPassword - The new password for the user.
+   * @returns {Promise<void>} - A promise that resolves when the password is reset.
+   */
+  async resetPassword(token, newPassword) {
+    const hashedToken = tokenUtils.hashToken(token);
+    const resetRecord = await prisma.passwordReset.findFirst({
+      where: {
+        tokenHash: hashedToken,
+        expiresAt: { gte: new Date() },
+      },
+      select: {
+        id: true,
+        userId: true,
+        usedAt: true,
+      },
+    });
+
+    if (!resetRecord || resetRecord.usedAt) {
+      throw ApiError.badRequest("Token is invalid or has expired", {
+        code: "TOKEN_INVALID",
+      });
+    }
+
+    const hashedPassword = await hashUtils.hashPassword(newPassword);
+
+    try {
+      await prisma.$transaction(async tx => {
+        await tx.user.update({
+          where: {
+            id: resetRecord.userId,
+            status: { not: "DEACTIVATED" },
+          },
+          data: {
+            passwordHash: hashedPassword,
+            passwordChangedAt: new Date(),
+          },
+        });
+
+        const claimed = await tx.passwordReset.updateMany({
+          where: { id: resetRecord.id, usedAt: null },
+          data: {
+            usedAt: new Date(),
+          },
+        });
+
+        if (claimed.count === 0) {
+          throw ApiError.badRequest("Token is invalid or has expired", {
+            code: "TOKEN_INVALID",
+          });
+        }
+
+        await tx.refreshToken.updateMany({
+          where: { userId: resetRecord.userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      });
+    } catch (error) {
+      logger.error("Error resetting password", { error });
+      if (error?.code === "P2025") {
+        throw ApiError.unauthorized("User not found or deactivated", {
+          code: "USER_NOT_FOUND",
+          error,
+        });
+      }
+      throw error;
+    }
   }
 }
 

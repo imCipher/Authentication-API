@@ -27,6 +27,12 @@ const signRefreshToken = () => {
 };
 
 /**
+ * Generate a high-entropy opaque token for one time flows (password reset).
+ * @returns {string} - Cryptographically random hex string
+ */
+const secureToken = () => crypto.randomBytes(32).toString("hex");
+
+/**
  * Verify and decode an access token (JWT).
  * @param {string} token - The JWT from the Authorization header
  * @returns {Object} - Decoded payload ({sub, role, iat, exp})
@@ -93,6 +99,7 @@ const expiresAt = (time = 15) => {
 export default {
   signAccessToken,
   signRefreshToken,
+  secureToken,
   verifyAccessToken,
   hashToken,
   verificationToken,

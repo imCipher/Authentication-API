@@ -176,6 +176,35 @@ const resendVerificationEmailSchema = {
   }),
 };
 
+/**
+ * Validation schema for resetting passwords.
+ * This schema ensures that the reset token, new password, and confirmation of the new password are provided and meet the specified criteria.
+ */
+const resetPasswordSchema = {
+  body: z
+    .object({
+      token: z
+        .string("Reset token is required")
+        .min(8, "Reset token must be at least 8 characters long"),
+      newPassword: z
+        .string("Password is required")
+        .normalize("NFC")
+        .min(8, "Password must be at least 8 characters long")
+        .max(72, "Password must not exceed 72 characters")
+        .regex(
+          /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).*$/,
+          "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+        ),
+      confirmNewPassword: z
+        .string("Confirm password is required")
+        .normalize("NFC"),
+    })
+    .refine(data => data.newPassword === data.confirmNewPassword, {
+      message: "Passwords do not match",
+    })
+    .strict(),
+};
+
 export default {
   registerSchema,
   loginSchema,
@@ -183,4 +212,5 @@ export default {
   resendVerificationEmailSchema,
   refreshTokenSchema,
   verifyEmailSchema,
+  resetPasswordSchema,
 };

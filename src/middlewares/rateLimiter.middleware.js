@@ -157,8 +157,8 @@ export const emailVerificationRateLimiter = createRateLimiterWithFallback({
 export const passwordResetRateLimiter = createRateLimiterWithFallback({
   storePrefix: "rl:password-reset:",
   label: "password-reset",
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3, // 3 requests per 15 minutes per IP
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // 5 requests per hour per IP
   message: "Too many password reset requests, please try again later.",
 });
 

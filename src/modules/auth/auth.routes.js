@@ -6,6 +6,7 @@ import {
   registerRateLimiter,
   loginRateLimiter,
   emailVerificationRateLimiter,
+  passwordResetRateLimiter,
 } from "../../middlewares/rateLimiter.middleware.js";
 import authSchema from "./auth.validation.js";
 import validateRequest from "../../middlewares/validator.middleware.js";
@@ -344,9 +345,16 @@ router.post(
  */
 router.post(
   "/forgot-password",
-  emailVerificationRateLimiter,
-  validateRequest(authSchema.verifyEmailSchema),
+  passwordResetRateLimiter,
+  validateRequest(authSchema.resendVerificationEmailSchema),
   authController.forgotPassword,
+);
+
+router.post(
+  "/reset-password",
+  passwordResetRateLimiter,
+  validateRequest(authSchema.resetPasswordSchema),
+  authController.resetPassword,
 );
 
 export default router;

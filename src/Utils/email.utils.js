@@ -14,12 +14,13 @@ class Email {
    * @param {Object} user  - The user object containing user details.
    * @param {string} user.email - The email address of the user.
    * @param {string} user.fullName - The full name of the user.
-   * @param {string} code - The verification or reset code to be sent in the email.
+   * @param {string} [code] - The verification or reset code to be sent in the email.
    */
-  constructor(user, code) {
+  constructor(user, code = undefined) {
     this.to = user.email;
     this.firstName = user.fullName.split(" ")[0];
     this.code = code;
+    this.url = url;
     this.from = `Test Auth < ${finalConfig.email.from}>`;
   }
 
@@ -47,14 +48,16 @@ class Email {
    * Sends an email using a specified template and subject.
    * @param {string} template - The Pug template to use for the email.
    * @param {string} subject - The subject of the email.
+   * @param {string} [urlCode] - Optional code to include in the email (e.g., password reset).
    * @returns {Promise<void>} - A promise that resolves when the email is sent.
    */
-  async send(template, subject) {
+  async send(template, subject, urlCode = undefined) {
     const html = pug.renderFile(
       `${import.meta.dirname}/../views/${template}.pug`,
       {
         firstName: this.firstName,
         code: this.code,
+        url: `http://localhost:3000/reset-password/${urlCode}`,
         subject,
       },
     );
@@ -75,8 +78,8 @@ class Email {
   }
 
   // Sends a password reset email.
-  async sendPasswordReset() {
-    await this.send("resetpassword", "Reset your password");
+  async sendPasswordReset(urlCode) {
+    await this.send("resetpassword", "Reset your password", urlCode);
   }
 }
 

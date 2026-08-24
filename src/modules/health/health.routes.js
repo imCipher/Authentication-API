@@ -10,7 +10,11 @@ const startedAt = new Date().toLocaleString("en-US", {
   timeStyle: "medium",
 });
 
-// /health route to check the health of the application
+/**
+ * @route GET /health
+ * @desc Health check endpoint to verify that the API is running and responsive.
+ * @access Public
+ */
 router.get("/", (req, res) => {
   res.status(200).json({
     status: "ok",
@@ -26,7 +30,13 @@ router.get("/", (req, res) => {
   });
 });
 
-// /health/ready route to check database connectivity
+/**
+ * @route GET /health/ready
+ * @desc Readiness check endpoint to verify that the API can connect to the database.
+ * @access Public
+ * @note This endpoint is useful for container orchestration platforms like Kubernetes
+ *       to determine if the application is ready to receive traffic.
+ */
 router.get("/ready", async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;

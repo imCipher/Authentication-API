@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import pug from "pug";
 
-import logger from "../config/logger.js";
+
 import finalConfig from "../config/keys.js";
 
 /**

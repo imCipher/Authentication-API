@@ -1,4 +1,4 @@
-import ApiError, { DEFAULT_CODES } from "../Utils/ApiError.js";
+import ApiError, { DEFAULT_CODES } from "../utils/ApiError.js";
 import logger from "../config/logger.js";
 import finalConfig from "../config/keys.js";
 

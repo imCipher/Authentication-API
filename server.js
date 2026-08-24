@@ -30,6 +30,11 @@ validateConfig();
 
 const PORT = finalConfig.port;
 
+/**
+ * Start the Express server after ensuring that the database and Redis connections are established.
+ * This function also sets up graceful shutdown handlers for SIGTERM and SIGINT signals.
+ * In case of any errors during startup, it logs the error and exits the process.
+ */
 const startServer = async () => {
   try {
     // 1. Initialize the connection pool

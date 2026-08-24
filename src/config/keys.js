@@ -1,10 +1,12 @@
 import "dotenv/config";
 
-// Storing configuration values in a single object makes it easier
-// to manage and access them throughout the application.
-// This object can be imported wherever needed,
-// ensuring consistency and reducing the risk of typos
-// or mismatched values.
+/** 
+ * Storing configuration values in a single object makes it easier
+ * to manage and access them throughout the application.
+ * This object can be imported wherever needed,
+ * ensuring consistency and reducing the risk of typos
+ * or mismatched values. 
+ */
 const config = {
   // Server
   env: (process.env.NODE_ENV || "development").toLowerCase(),

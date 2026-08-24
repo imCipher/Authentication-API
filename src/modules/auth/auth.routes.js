@@ -191,12 +191,6 @@ router.post(
  *                message:
  *                  type: string
  *                  example: Email resent successfully. Please check your email to verify your account.
- *      400:
- *        description: Bad request. Please check your input.
- *        content:
- *          application/json:
- *            schema:
- *              $ref: '#/components/schemas/ApiValidationError'
  *      429:
  *        description: Too many requests. Please try again later.
  *        content:
@@ -308,6 +302,46 @@ router.post(
   authController.refreshToken,
 );
 
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *    summary: Send forgot password email.
+ *    description: This endpoint allows users to request a password reset email. If the email exists in our system, a reset link will be sent.
+ *    security: []
+ *    tags: [Authentication]
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required: [email]
+ *            properties:
+ *              email:
+ *                type: string
+ *                example: "johndoe@example.com"
+ *    responses:
+ *      200:
+ *        description: Email Sent Successfully
+ *        content:
+ *          application/json:
+ *            schema:
+ *              type: object
+ *              properties:
+ *                success:
+ *                  type: boolean
+ *                  example: true
+ *                message:
+ *                  type: string
+ *                  example: Password reset email sent successfully. Please check your email.
+ *      429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ */
 router.post(
   "/forgot-password",
   emailVerificationRateLimiter,

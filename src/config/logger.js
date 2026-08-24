@@ -71,9 +71,11 @@ const consoleFormat = winston.format.combine(
       const picked = Object.fromEntries(keys.map(k => [k, meta[k]]));
       let rendered;
       try {
-        rendered = JSON.stringify(picked, (_k, v) =>
-          typeof v === "bigint" ? v.toString() : v,
-        );
+        rendered = JSON.stringify(picked, (_k, v) =>{
+          if (typeof v === "bigint") v.toString(); // Convert BigInt to string for JSON serialization
+          if (v instanceof Error) return { name: v.name, message: v.message, stack: v.stack }; // Serialize Error objects
+          return v;
+        });
       } catch {
         rendered = "[unserializable metadata]";
       }

@@ -181,11 +181,13 @@ const resendVerificationEmailSchema = {
  * This schema ensures that the reset token, new password, and confirmation of the new password are provided and meet the specified criteria.
  */
 const resetPasswordSchema = {
+  params: z.object({
+    token: z
+      .string("Reset token is required")
+      .min(8, "Reset token must be at least 8 characters long"),
+  }),
   body: z
     .object({
-      token: z
-        .string("Reset token is required")
-        .min(8, "Reset token must be at least 8 characters long"),
       newPassword: z
         .string("Password is required")
         .normalize("NFC")

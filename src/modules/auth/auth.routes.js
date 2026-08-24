@@ -350,8 +350,69 @@ router.post(
   authController.forgotPassword,
 );
 
+/**
+ * @swagger
+ * /auth/reset-password/:token:
+ *   post:
+ *    summary: Reset password using the token sent to the user's email address.
+ *    description: This endpoint allows users to reset their password by providing the reset token they received via email along with their new password. The token is typically sent to the user's email after they request a password reset.
+ *    security: []
+ *    tags: [Authentication]
+ *    parameters:
+ *      - in: path
+ *        name: token
+ *        required: true
+ *        schema:
+ *          type: string
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required: [newPassword, confirmPassword]
+ *            properties:
+ *              newPassword:
+ *                type: string
+ *                example: "new-password"
+ *              confirmPassword:
+ *                type: string
+ *                example: "new-password"
+ *    responses:
+ *      200:
+ *        description: Email Sent Successfully
+ *        content:
+ *          application/json:
+ *            schema:
+ *              type: object
+ *              properties:
+ *                success:
+ *                  type: boolean
+ *                  example: true
+ *                message:
+ *                  type: string
+ *                  example: Password reset successfully, please log in with your new password.
+ *      400:
+ *        description: Bad request. Please check your input.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiValidationError'
+ *      401:
+ *        description: Unauthorized. The token is invalid or has expired.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiError'
+ *      429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiError'
+ */
 router.post(
-  "/reset-password",
+  "/reset-password/:token",
   passwordResetRateLimiter,
   validateRequest(authSchema.resetPasswordSchema),
   authController.resetPassword,

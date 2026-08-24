@@ -127,10 +127,14 @@ const forgotPassword = CatchAsync(async (req, res, next) => {
  * @access Public
  */
 const resetPassword = CatchAsync(async (req, res, next) => {
-  const { token, newPassword } = req.validated.body;
+  const { newPassword } = req.validated.body;
+  const { token } = req.validated.params;
   await AuthService.resetPassword(token, newPassword);
 
-  ApiResponse.success(res, "Password reset successfully.");
+  ApiResponse.success(
+    res,
+    "Password reset successfully, please log in with your new password.",
+  );
 });
 
 export default {

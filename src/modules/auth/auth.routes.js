@@ -324,7 +324,7 @@ router.post(
  *                example: "johndoe@example.com"
  *    responses:
  *      200:
- *        description: Email Sent Successfully
+ *        description: Password reset email sent successfully. Please check your email for further instructions.
  *        content:
  *          application/json:
  *            schema:
@@ -352,7 +352,7 @@ router.post(
 
 /**
  * @swagger
- * /auth/reset-password/:token:
+ * /auth/reset-password/{token}:
  *   post:
  *    summary: Reset password using the token sent to the user's email address.
  *    description: This endpoint allows users to reset their password by providing the reset token they received via email along with their new password. The token is typically sent to the user's email after they request a password reset.
@@ -370,14 +370,14 @@ router.post(
  *        application/json:
  *          schema:
  *            type: object
- *            required: [newPassword, confirmPassword]
+ *            required: [newPassword, confirmNewPassword]
  *            properties:
  *              newPassword:
  *                type: string
- *                example: "new-password"
- *              confirmPassword:
+ *                example: "SecureP@ss2"
+ *              confirmNewPassword:
  *                type: string
- *                example: "new-password"
+ *                example: "SecureP@ss2"
  *    responses:
  *      200:
  *        description: Email Sent Successfully

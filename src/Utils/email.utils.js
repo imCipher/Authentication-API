@@ -1,7 +1,6 @@
 import nodemailer from "nodemailer";
 import pug from "pug";
 
-
 import finalConfig from "../config/keys.js";
 
 /**
@@ -20,7 +19,6 @@ class Email {
     this.to = user.email;
     this.firstName = user.fullName.split(" ")[0];
     this.code = code;
-    this.url = url;
     this.from = `Test Auth < ${finalConfig.email.from}>`;
   }
 

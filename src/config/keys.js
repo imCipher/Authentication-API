@@ -60,6 +60,11 @@ const config = {
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
     refreshSecret: process.env.JWT_REFRESH_SECRET,
     refreshExpiresIn: parseInt(process.env.JWT_REFRESH_EXPIRES_IN, 10) || 7, // Default 7 days
+    // A rotated-away refresh token re-presented within this many seconds is
+    // treated as benign concurrency (second tab, parallel mobile requests) and
+    // receives the same replacement pair, instead of triggering reuse detection.
+    refreshGraceWindowSeconds:
+      parseInt(process.env.JWT_REFRESH_GRACE_WINDOW_SECONDS, 10) || 30,
   },
 
   // Cors
@@ -115,6 +120,17 @@ export const validateConfig = () => {
   if (!/^\d+(ms|s|m|h|d)$/.test(String(config.jwt.accessExpiresIn))) {
     throw new Error(
       `JWT_ACCESS_EXPIRES_IN must include a unit (e.g. "15m"), got "${config.jwt.accessExpiresIn}"`,
+    );
+  }
+
+  // A huge window would let grace replays stand in for real reuse detection.
+  if (
+    !Number.isInteger(config.jwt.refreshGraceWindowSeconds) ||
+    config.jwt.refreshGraceWindowSeconds < 0 ||
+    config.jwt.refreshGraceWindowSeconds > 300
+  ) {
+    throw new Error(
+      `JWT_REFRESH_GRACE_WINDOW_SECONDS must be an integer between 0 and 300, got "${config.jwt.refreshGraceWindowSeconds}"`,
     );
   }
 };

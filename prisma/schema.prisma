@@ -84,6 +84,7 @@ model RefreshToken {
   expiresAt     DateTime  @map("expires_at")
   revokedAt     DateTime? @map("revoked_at")
   replacedBy    String?   @map("replaced_by") @db.Uuid // Points to the token it was replaced by
+  graceToken    String?   @map("grace_token") // Raw replacement token, served only to replays inside the rotation grace window
   createdAt     DateTime  @default(now()) @map("created_at")
 
   // Relations
@@ -91,6 +92,7 @@ model RefreshToken {
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([replacedBy])
   @@map("refresh_tokens")
 }
 

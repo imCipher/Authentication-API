@@ -127,7 +127,6 @@ const forgotPassword = CatchAsync(async (req, res, next) => {
  * @access Public
  */
 const resetPassword = CatchAsync(async (req, res, next) => {
-  console.log(req.params);
   const { newPassword } = req.validated.body;
   const { token } = req.validated.params;
   await AuthService.resetPassword(token, newPassword);

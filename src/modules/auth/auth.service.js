@@ -231,6 +231,19 @@ class AuthService {
   /**
    * Revokes the current refresh token and issues a new access token and refresh token.
    *
+   * Rotation is atomic: claim, successor provisioning, and grace-token linkage
+   * commit in one transaction, so a crash can never strand a revoked row without
+   * its replacement (which would escalate an infra blip into a family nuke).
+   *
+   * A rotated-away token re-presented within the grace window
+   * (finalConfig.jwt.refreshGraceWindowSeconds) is treated as benign concurrency
+   * — second tab, parallel mobile requests — and receives the same replacement
+   * pair once; see handleReplay.
+   *
+   * The row is matched on tokenHash alone: possession of a 512-bit random token
+   * IS the authentication. IP/UA are soft signals only — hard-matching them
+   * logs mobile users out whenever their network changes (Wi-Fi <-> cellular).
+   *
    * @param {string} refreshToken - The current refresh token to be rotated.
    * @param {Object} metadata - Metadata containing user IP and user agent.
    * @param {string} metadata.userIp - The IP address of the user.
@@ -243,18 +256,21 @@ class AuthService {
     const tokenInfo = await prisma.refreshToken.findFirst({
       where: {
         tokenHash: hashedToken,
-        ipAddress: userIp,
-        userAgent,
       },
       select: {
         id: true,
         userId: true,
+        createdAt: true,
         expiresAt: true,
         revokedAt: true,
+        ipAddress: true,
+        userAgent: true,
+        graceToken: true,
         user: {
           select: {
             id: true,
             role: true,
+            passwordChangedAt: true,
           },
         },
       },
@@ -264,39 +280,197 @@ class AuthService {
       throw ApiError.unauthorized("Invalid refresh token", {
         code: "TOKEN_INVALID",
       });
-    } else if (tokenInfo.expiresAt < new Date()) {
+    }
+
+    if (tokenInfo.expiresAt < new Date()) {
       throw ApiError.unauthorized("Refresh token expired", {
         code: "TOKEN_EXPIRED",
       });
     }
 
-    if (tokenInfo.revokedAt) {
-      await prisma.refreshToken.updateMany({
-        where: { userId: tokenInfo.userId, revokedAt: null },
-        data: { revokedAt: new Date() },
+    // A credential change kills every family minted before it. Rejecting rows
+    // older than passwordChangedAt closes the window where a rotation racing a
+    // password reset could provision a successor that escapes the reset's
+    // revoke-all.
+    if (
+      tokenInfo.user.passwordChangedAt &&
+      tokenInfo.createdAt < tokenInfo.user.passwordChangedAt
+    ) {
+      throw ApiError.unauthorized("Invalid refresh token", {
+        code: "TOKEN_INVALID",
       });
-      throw ApiError.unauthorized(
-        "Refresh token reuse detected. All sessions have been revoked.",
-        {
-          code: "TOKEN_REVOKED",
-        },
-      );
+    }
+
+    // Possession authenticates, but a different device fingerprint on a live
+    // token is worth surfacing (soft binding — never a rejection).
+    if (
+      !tokenInfo.revokedAt &&
+      (tokenInfo.userAgent !== userAgent || tokenInfo.ipAddress !== userIp)
+    ) {
+      logger.warn("Refresh token used from unexpected device", {
+        userId: tokenInfo.userId,
+        tokenId: tokenInfo.id,
+        expectedUserAgent: tokenInfo.userAgent,
+        actualUserAgent: userAgent,
+        expectedIp: tokenInfo.ipAddress,
+        actualIp: userIp,
+      });
     }
 
     const accessToken = await this.generateAccessToken(tokenInfo.user);
 
-    const newRefreshToken = await this.generateRefreshToken(tokenInfo.userId, {
-      userIp,
-      userAgent,
+    // Claim + provision + link in ONE transaction. Concurrent losers block on
+    // the parent row until commit, then see both revokedAt AND graceToken —
+    // no window where a replay can observe one without the other.
+    const successor = await prisma.$transaction(async tx => {
+      const claimed = await tx.refreshToken.updateMany({
+        where: { id: tokenInfo.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      if (claimed.count === 0) {
+        return null; // Lost the race — handled below.
+      }
+
+      const newRefreshToken = await this.generateRefreshToken(
+        tokenInfo.userId,
+        { userIp, userAgent },
+        tx,
+      );
+
+      await tx.refreshToken.update({
+        where: { id: tokenInfo.id },
+        data: {
+          replacedBy: newRefreshToken.id,
+          graceToken: newRefreshToken.refreshToken,
+        },
+      });
+
+      // The grandparent's grace copy points at the row we just rotated away —
+      // it can no longer be served safely, so retire it here.
+      await tx.refreshToken.updateMany({
+        where: { replacedBy: tokenInfo.id, graceToken: { not: null } },
+        data: { graceToken: null },
+      });
+
+      return newRefreshToken;
     });
 
-    // Revoke the old refresh token
-    await prisma.refreshToken.update({
-      where: { id: tokenInfo.id },
-      data: { revokedAt: new Date(), replacedBy: newRefreshToken.id },
-    });
+    if (!successor) {
+      return this.handleReplay(tokenInfo);
+    }
 
-    return { accessToken, refreshToken: newRefreshToken.refreshToken };
+    return { accessToken, refreshToken: successor.refreshToken };
+  }
+
+  /**
+   * Handles presentation of a refresh token that lost the rotation race or was
+   * already rotated away.
+   *
+   * Within the grace window this is legitimate concurrent use, so the caller
+   * receives the exact replacement pair the winner got — ONCE. The grant is
+   * consumed atomically when served, so repeat presentations of the same stale
+   * token are treated as reuse (a thief re-syncing onto the victim's chain is
+   * precisely what reuse detection exists for). Outside the window — or after
+   * the grant is consumed — every active session is revoked.
+   *
+   * @param {Object} tokenInfo - Pre-claim snapshot of the refresh token row.
+   * @returns {Promise<Object>} - An object containing a fresh access token and the surviving refresh token.
+   * @throws {ApiError} - Throws a 401 TOKEN_REVOKED when reuse is detected, TOKEN_INVALID when the successor is dead.
+   */
+  async handleReplay(tokenInfo) {
+    const graceMs = finalConfig.jwt.refreshGraceWindowSeconds * 1000;
+
+    let info = tokenInfo;
+
+    // Normally zero iterations: rotation commits claim and graceToken together,
+    // so replays see both or neither. Kept as belt-and-braces for the case
+    // where the winner's transaction is somehow still open.
+    for (let attempt = 0; attempt < 3 && !info.graceToken; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const fresh = await prisma.refreshToken.findUnique({
+        where: { id: info.id },
+        select: {
+          userId: true,
+          expiresAt: true,
+          revokedAt: true,
+          replacedBy: true,
+          graceToken: true,
+          user: {
+            select: {
+              id: true,
+              role: true,
+            },
+          },
+        },
+      });
+      if (!fresh) break;
+      info = fresh;
+    }
+
+    const revokedAtMs = info.revokedAt ? info.revokedAt.getTime() : Date.now();
+    const withinWindow = (Date.now() - revokedAtMs) <= graceMs;
+
+    if (withinWindow && info.graceToken && info.replacedBy) {
+      // Serve the raw replacement only while the successor itself is alive —
+      // otherwise a chain rotation or security revoke would hand out a
+      // dead-on-arrival token whose only future is another family nuke.
+      const successor = await prisma.refreshToken.findUnique({
+        where: { id: info.replacedBy },
+        select: { revokedAt: true, expiresAt: true },
+      });
+
+      const successorLive =
+        successor && !successor.revokedAt && successor.expiresAt > new Date();
+
+      if (successorLive) {
+        // One-shot consumption: two tabs passing liveness simultaneously race
+        // here; exactly one wins, the other falls through to reuse handling.
+        const consumed = await prisma.refreshToken.updateMany({
+          where: { id: info.id, graceToken: { not: null } },
+          data: { graceToken: null },
+        });
+
+        if (consumed.count > 0) {
+          logger.info("Served grace-window replay", {
+            userId: info.userId,
+            tokenId: info.id,
+          });
+          const accessToken = await this.generateAccessToken(info.user);
+          return { accessToken, refreshToken: info.graceToken };
+        }
+      } else {
+        // Successor is gone — refuse WITHOUT declaring theft: the presenter may
+        // be a straggler that the grace mechanism itself served moments ago.
+        throw ApiError.unauthorized("Invalid refresh token", {
+          code: "TOKEN_INVALID",
+        });
+      }
+    }
+
+    // Outside the window, or the grant was already consumed: genuine reuse —
+    // revoke everything, and retire any remaining grace copies so nothing can
+    // be resurrected from a dead family.
+    await prisma.$transaction([
+      prisma.refreshToken.updateMany({
+        where: { userId: info.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      prisma.refreshToken.updateMany({
+        where: { userId: info.userId, graceToken: { not: null } },
+        data: { graceToken: null },
+      }),
+    ]);
+    logger.warn("Refresh token reuse detected — all sessions revoked", {
+      userId: info.userId,
+      tokenId: info.id,
+    });
+    throw ApiError.unauthorized(
+      "Refresh token reuse detected. All sessions have been revoked.",
+      {
+        code: "TOKEN_REVOKED",
+      },
+    );
   }
 
   /**
@@ -346,16 +520,18 @@ class AuthService {
    * @param {Object} metadata - Metadata containing user IP and user agent.
    * @param {string} metadata.userIp - The IP address of the user.
    * @param {string} metadata.userAgent - The user agent string of the user's device.
+   * @param {Object} [client=prisma] - Prisma client or transaction object used to
+   *   create the row, so callers can bundle it atomically with other writes.
    * @returns {Promise<{refreshToken: string, id: string}>} - The generated refresh token string and id.
    * @throws {ApiError} - Throws an error if the refresh token cannot be generated or stored.
    */
-  async generateRefreshToken(userId, metadata) {
+  async generateRefreshToken(userId, metadata, client = prisma) {
     const daysUntilExpiry = finalConfig.jwt.refreshExpiresIn;
     const refreshToken = await tokenUtils.signRefreshToken();
     const hashedRefreshToken = tokenUtils.hashToken(refreshToken);
     const expiryTime = tokenUtils.expiresAt(daysUntilExpiry * 24 * 60);
 
-    const newRefreshToken = await prisma.refreshToken.create({
+    const newRefreshToken = await client.refreshToken.create({
       data: {
         userId,
         tokenHash: hashedRefreshToken,
@@ -528,6 +704,11 @@ class AuthService {
 
     try {
       await prisma.$transaction(async tx => {
+        // Read the clock from the DB so passwordChangedAt shares a time domain
+        // with refreshToken.createdAt (DB DEFAULT CURRENT_TIMESTAMP) — the
+        // stale-family guard in rotateRefreshToken compares the two directly.
+        const [{ now: dbNow }] = await tx.$queryRaw`SELECT NOW() AS now`;
+
         await tx.user.update({
           where: {
             id: resetRecord.userId,
@@ -535,14 +716,14 @@ class AuthService {
           },
           data: {
             passwordHash: hashedPassword,
-            passwordChangedAt: new Date(),
+            passwordChangedAt: dbNow,
           },
         });
 
         const claimed = await tx.passwordReset.updateMany({
           where: { id: resetRecord.id, usedAt: null },
           data: {
-            usedAt: new Date(),
+            usedAt: dbNow,
           },
         });
 
@@ -556,10 +737,30 @@ class AuthService {
           );
         }
 
-        await tx.refreshToken.updateMany({
-          where: { userId: resetRecord.userId, revokedAt: null },
-          data: { revokedAt: new Date() },
-        });
+        const revokeAllSessions = () =>
+          tx.refreshToken.updateMany({
+            where: { userId: resetRecord.userId, revokedAt: null },
+            data: { revokedAt: dbNow },
+          });
+
+        // Grace copies point at successors that just died — clear them so a
+        // replay can't resurrect a session after a credential invalidation.
+        const clearGraceCopies = () =>
+          tx.refreshToken.updateMany({
+            where: { userId: resetRecord.userId, graceToken: { not: null } },
+            data: { graceToken: null },
+          });
+
+        await revokeAllSessions();
+        await clearGraceCopies();
+
+        // Repeat both sweeps as the FINAL statements. A rotation transaction
+        // that held the parent row's lock commits a successor invisible to our
+        // earlier statement snapshots — under READ COMMITTED, UPDATE ... WHERE
+        // re-checks only locked rows and never sees concurrent INSERTs. A
+        // fresh snapshot here is what catches that late-committed successor.
+        await revokeAllSessions();
+        await clearGraceCopies();
       });
     } catch (error) {
       if (error instanceof ApiError) throw error; // Re-throw if it's an ApiError

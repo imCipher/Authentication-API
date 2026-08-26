@@ -775,9 +775,69 @@ class AuthService {
     }
   }
 
+  /**
+   * Logs out a user by revoking their refresh token and clearing any associated grace tokens.
+   *
+   * This method ensures that the user's session is terminated and prevents further use of the refresh token for obtaining new access tokens.
+   * @param {string} userId - The ID of the user to log out.
+   * @param {string} refreshToken - The refresh token to be revoked.
+   * @returns {Promise<void>} - A promise that resolves when the logout process is complete.
+   * @throws {ApiError} - Throws an error if the logout process fails due to database issues or other unexpected errors.
+   */
   async logout(userId, refreshToken) {
     const hashedToken = tokenUtils.hashToken(refreshToken);
-    
+
+    try {
+      await prisma.$transaction(async tx => {
+        // Locate the specific refresh token record for the user
+        const tokenRecord = await tx.refreshToken.findFirst({
+          where: {
+            userId,
+            tokenHash: hashedToken,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        // If the token does not exist or was already purged, exit safely (idempotent logout)
+        if (!tokenRecord) {
+          logger.warn("Logout attempted with unrecognized or deleted token", {
+            userId,
+          });
+          return; // Exit if the token is not found
+        }
+
+        // 2. Revoke the token and clear its grace token in ONE atomic update
+        await tx.refreshToken.update({
+          where: {
+            id: tokenRecord?.id,
+          },
+          data: {
+            revokedAt: new Date(),
+            graceToken: null,
+          },
+        });
+
+        // 3. Clean up any predecessor grace copies pointing to this revoked token
+        await tx.refreshToken.updateMany({
+          where: {
+            replacedBy: tokenRecord.id,
+            graceToken: { not: null },
+          },
+          data: {
+            graceToken: null,
+          },
+        });
+      });
+      logger.info("User logged out successfully", { userId });
+    } catch (error) {
+      if (error instanceof ApiError) throw error; // Re-throw if it's an ApiError
+      logger.error("Error during logout process", error);
+      throw ApiError.internal("An error occurred during logout", {
+        cause: error,
+      });
+    }
   }
 }
 

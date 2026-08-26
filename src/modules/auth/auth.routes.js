@@ -418,6 +418,52 @@ router.post(
   authController.resetPassword,
 );
 
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *    summary: Logout the current user
+ *    description: This endpoint allows the currently authenticated user to log out by invalidating their refresh token. The user must provide a valid refresh token in the request body. Upon successful logout, the refresh token will be revoked, and the user will need to log in again to obtain new tokens.
+ *    tags: [Authentication]
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required: [refreshToken]
+ *            properties:
+ *              refreshToken:
+ *                type: string
+ *                example: "refresh_token_here"
+ *    responses:
+ *    responses:
+ *      200:
+ *        description: Logout successful. The refresh token has been revoked, and the user is logged out.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              type: object
+ *              properties:
+ *                success:
+ *                  type: boolean
+ *                  example: true
+ *                message:
+ *                  type: string
+ *                  example: Logout successful.
+ *      400:
+ *        description: Bad request. Please check your input.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiValidationError'
+ *      429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiError'
+ */
 router.post(
   "/logout",
   protect,

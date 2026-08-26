@@ -137,6 +137,19 @@ const resetPassword = CatchAsync(async (req, res, next) => {
   );
 });
 
+/**
+ * @route POST /api/v1/auth/logout
+ * @desc Logout a user by invalidating their refresh token
+ * @access Private
+ */
+const logout = CatchAsync(async (req, res, next) => {
+  const { refreshToken } = req.validated.body;
+  const { userId } = req.user;
+  await AuthService.logout(userId, refreshToken);
+
+  ApiResponse.success(res, "Logout successful.");
+});
+
 export default {
   register,
   login,
@@ -145,4 +158,5 @@ export default {
   verifyEmail,
   forgotPassword,
   resetPassword,
+  logout,
 };

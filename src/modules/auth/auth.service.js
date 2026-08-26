@@ -409,7 +409,7 @@ class AuthService {
     }
 
     const revokedAtMs = info.revokedAt ? info.revokedAt.getTime() : Date.now();
-    const withinWindow = (Date.now() - revokedAtMs) <= graceMs;
+    const withinWindow = Date.now() - revokedAtMs <= graceMs;
 
     if (withinWindow && info.graceToken && info.replacedBy) {
       // Serve the raw replacement only while the successor itself is alive —
@@ -773,6 +773,11 @@ class AuthService {
       }
       throw error; // Re-throw other unexpected errors
     }
+  }
+
+  async logout(userId, refreshToken) {
+    const hashedToken = tokenUtils.hashToken(refreshToken);
+    
   }
 }
 

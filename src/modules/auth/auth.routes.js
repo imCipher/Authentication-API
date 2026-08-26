@@ -418,4 +418,11 @@ router.post(
   authController.resetPassword,
 );
 
+router.post(
+  "/logout",
+  protect,
+  validateRequest(authSchema.refreshTokenSchema),
+  authController.logout,
+);
+
 export default router;

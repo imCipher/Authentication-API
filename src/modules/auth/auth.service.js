@@ -839,6 +839,65 @@ class AuthService {
       });
     }
   }
+
+  /**
+   * Logs out a user from all sessions by revoking all their refresh tokens and clearing any associated grace tokens.
+   *
+   * This method ensures that the user's sessions are terminated across all devices and prevents further use of any refresh tokens for obtaining new access tokens.
+   * @param {string} userId - The ID of the user to log out from all sessions.
+   * @param {Object} metadata - Metadata about the request, including user IP and user agent.
+   * @returns {Promise<void>} - A promise that resolves when the logout process is complete.
+   * @throws {ApiError} - Throws an error if the userId is invalid or if the logout process fails due to database issues or other unexpected errors.
+   */
+  async logoutAll(userId, metadata = {}) {
+    if (!userId || typeof userId !== "string") {
+      throw ApiError.badRequest("Invalid user ID provided.");
+    }
+
+    try {
+      await prisma.$transaction(async tx => {
+        // Find all active refresh tokens for the user
+        await tx.refreshToken.updateMany({
+          where: {
+            userId,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: new Date(),
+            graceToken: null,
+          },
+        });
+
+        // Clean up any grace copies pointing to the revoked tokens
+        await tx.refreshToken.updateMany({
+          where: {
+            userId,
+            graceToken: { not: null },
+          },
+          data: {
+            graceToken: null,
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: "LOGOUT_ALL",
+            resource: "auth",
+            message: "User logged out from all sessions",
+            ipAddress: metadata.userIp || null,
+            userAgent: metadata.userAgent || null,
+          },
+        });
+      });
+    } catch (error) {
+      if (error instanceof ApiError) throw error; // Re-throw if it's an ApiError
+      logger.error("Error during logoutAll process", error);
+      throw ApiError.internal("An error occurred during logoutAll", {
+        cause: error,
+      });
+    }
+  }
 }
 
 export default new AuthService();

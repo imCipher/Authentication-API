@@ -144,10 +144,23 @@ const resetPassword = CatchAsync(async (req, res, next) => {
  */
 const logout = CatchAsync(async (req, res, next) => {
   const { refreshToken } = req.validated.body;
-  const { userId } = req.user;
-  await AuthService.logout(userId, refreshToken);
+  const { id } = req.user;
+  await AuthService.logout(id, refreshToken);
 
   ApiResponse.success(res, "Logout successful.");
+});
+
+/**
+ * @route POST /api/v1/auth/logout-all
+ * @desc Logout a user from all sessions by invalidating all their refresh tokens
+ * @access Private
+ */
+const logoutAll = CatchAsync(async (req, res, next) => {
+  const { id } = req.user;
+  const metadata = getRequestMetadata(req);
+  await AuthService.logoutAll(id, metadata);
+
+  ApiResponse.success(res, "Logged out from all sessions successfully.");
 });
 
 export default {
@@ -159,4 +172,5 @@ export default {
   forgotPassword,
   resetPassword,
   logout,
+  logoutAll
 };

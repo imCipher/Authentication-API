@@ -471,4 +471,27 @@ router.post(
   authController.logout,
 );
 
+/**
+ * @swagger
+ * /auth/logout-all:
+ *   post:
+ *    summary: Logout the current user from all sessions
+ *    description: This endpoint allows the currently authenticated user to log out from all sessions by invalidating all their refresh tokens. Upon successful logout, all active sessions for the user will be terminated, and they will need to log in again to obtain new tokens.
+ *    tags: [Authentication]
+ *    responses:
+ *      200:
+ *        description: Successful response description
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiSuccess'
+ *      429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiError'
+ */
+router.post("/logout-all", protect, authController.logoutAll);
+
 export default router;

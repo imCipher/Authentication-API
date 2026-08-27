@@ -511,9 +511,7 @@ router.post("/logout-all", protect, authController.logoutAll);
  *                - type: object
  *                  properties:
  *                    data:
- *                      type: object
- *                      properties:
- *                        $ref: '#/components/schemas/User'
+ *                      $ref: '#/components/schemas/User'
  *      400:
  *        description: Bad request. Please check your input.
  *        content:
@@ -546,10 +544,13 @@ router.get("/me", protect, authController.getCurrentUser);
  *            properties:
  *              currentPassword:
  *                type: string
+ *                example: "SecureP@ss2"
  *              newPassword:
  *                type: string
- *              confirmPassword:
+ *                example: "SecureP@ss1"
+ *              confirmNewPassword:
  *                type: string
+ *                example: "SecureP@ss1"
  *    responses:
  *      200:
  *        description: Password changed successfully. The user can now log in with the new password.

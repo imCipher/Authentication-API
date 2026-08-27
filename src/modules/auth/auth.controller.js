@@ -86,7 +86,8 @@ const refreshToken = CatchAsync(async (req, res, next) => {
  */
 const verifyEmail = CatchAsync(async (req, res, next) => {
   const { token } = req.validated.body;
-  await AuthService.verifyEmail(token);
+  const metadata = getRequestMetadata(req);
+  await AuthService.verifyEmail(token, metadata);
 
   ApiResponse.success(res, "Email verified successfully.");
 });
@@ -129,7 +130,8 @@ const forgotPassword = CatchAsync(async (req, res, next) => {
 const resetPassword = CatchAsync(async (req, res, next) => {
   const { newPassword } = req.validated.body;
   const { token } = req.validated.params;
-  await AuthService.resetPassword(token, newPassword);
+  const metadata = getRequestMetadata(req);
+  await AuthService.resetPassword(token, newPassword, metadata);
 
   ApiResponse.success(
     res,
@@ -195,11 +197,16 @@ const changePassword = CatchAsync(async (req, res, next) => {
 const updateProfile = CatchAsync(async (req, res, next) => {
   const { fullName, username, email } = req.validated.body;
   const { id } = req.user;
-  const updatedUser = await AuthService.updateProfile(id, {
-    fullName,
-    username,
-    email,
-  });
+  const metadata = getRequestMetadata(req);
+  const updatedUser = await AuthService.updateUserProfile(
+    id,
+    {
+      fullName,
+      username,
+      email,
+    },
+    metadata,
+  );
 
   ApiResponse.success(res, "Profile updated successfully.", {
     user: updatedUser,

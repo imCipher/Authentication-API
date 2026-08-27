@@ -175,10 +175,24 @@ class AuthService {
       if (failedAttemptsCount >= 5 && user.role !== "ADMIN") {
         const lockDuration = 15 * 60 * 1000; // 15 minutes
         const lockedUntil = new Date(Date.now() + lockDuration);
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lockedUntil, failedAttempts: 0 },
-        });
+        await prisma.$transaction([
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { lockedUntil, failedAttempts: 0 },
+          }),
+          await prisma.auditLog.create({
+            data: {
+              userId: user.id,
+              action: "ACCOUNT_LOCKED",
+              resource: "auth",
+              details: {
+                message: `Account locked due to multiple failed login attempts.`,
+              },
+              ipAddress: metadata?.userIp || null,
+              userAgent: metadata?.userAgent || null,
+            },
+          }),
+        ]);
         throw ApiError.unauthorized(
           "Account is temporarily locked due to multiple failed login attempts. Please try again later.",
         );
@@ -357,7 +371,7 @@ class AuthService {
     });
 
     if (!successor) {
-      return this.handleReplay(tokenInfo);
+      return this.handleReplay(tokenInfo, { userIp, userAgent });
     }
 
     return { accessToken, refreshToken: successor.refreshToken };
@@ -375,10 +389,11 @@ class AuthService {
    * the grant is consumed — every active session is revoked.
    *
    * @param {Object} tokenInfo - Pre-claim snapshot of the refresh token row.
+   * @param {Object} metadata - Metadata containing user IP and user agent.
    * @returns {Promise<Object>} - An object containing a fresh access token and the surviving refresh token.
    * @throws {ApiError} - Throws a 401 TOKEN_REVOKED when reuse is detected, TOKEN_INVALID when the successor is dead.
    */
-  async handleReplay(tokenInfo) {
+  async handleReplay(tokenInfo, metadata = {}) {
     const graceMs = finalConfig.jwt.refreshGraceWindowSeconds * 1000;
 
     let info = tokenInfo;
@@ -459,6 +474,18 @@ class AuthService {
       prisma.refreshToken.updateMany({
         where: { userId: info.userId, graceToken: { not: null } },
         data: { graceToken: null },
+      }),
+      await tx.auditLog.create({
+        data: {
+          userId: info.userId,
+          action: "TOKEN_REUSE_DETECTED",
+          resource: "auth",
+          details: {
+            message: `Refresh token reuse detected. All sessions have been revoked.`,
+          },
+          ipAddress: metadata?.userIp || null,
+          userAgent: metadata?.userAgent || null,
+        },
       }),
     ]);
     logger.warn("Refresh token reuse detected — all sessions revoked", {
@@ -555,10 +582,11 @@ class AuthService {
    * Verifies an email verification token and marks the user's email as verified.
    *
    * @param {string} token - The email verification token to verify.
+   * @param {Object} metadata - Metadata about the request.
    * @returns {Promise<boolean>} - Returns true if the email verification is successful.
    * @throws {ApiError} - Throws a 400 bad request error if the token is invalid or has expired.
    */
-  async verifyEmail(token) {
+  async verifyEmail(token, metadata = {}) {
     const hashedToken = tokenUtils.hashToken(token);
     const verificationRecord = await prisma.emailVerification.findFirst({
       where: {
@@ -585,6 +613,19 @@ class AuthService {
         where: { id: verificationRecord.userId },
         data: {
           emailVerified: true,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: "EMAIL_VERIFIED",
+          resource: "auth",
+          details: {
+            message: `User verified their email.`,
+          },
+          ipAddress: metadata?.userIp || null,
+          userAgent: metadata?.userAgent || null,
         },
       });
     });
@@ -686,9 +727,10 @@ class AuthService {
    *
    * @param {string} token - The verification token for the password reset.
    * @param {string} newPassword - The new password for the user.
+   * @param {Object} metadata - Metadata about the request.
    * @returns {Promise<void>} - A promise that resolves when the password is reset.
    */
-  async resetPassword(token, newPassword) {
+  async resetPassword(token, newPassword, metadata = {}) {
     const hashedToken = tokenUtils.hashToken(token);
     const resetRecord = await prisma.passwordReset.findFirst({
       where: {
@@ -769,6 +811,19 @@ class AuthService {
         // fresh snapshot here is what catches that late-committed successor.
         await revokeAllSessions();
         await clearGraceCopies();
+
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: "PASSWORD_RESET",
+            resource: "auth",
+            details: {
+              message: `User reset their password`,
+            },
+            ipAddress: metadata?.userIp || null,
+            userAgent: metadata?.userAgent || null,
+          },
+        });
       });
     } catch (error) {
       if (error instanceof ApiError) throw error; // Re-throw if it's an ApiError
@@ -892,7 +947,7 @@ class AuthService {
             userId,
             action: "LOGOUT_ALL",
             resource: "auth",
-            message: "User logged out from all sessions",
+            details: { message: "User logged out from all sessions" },
             ipAddress: metadata.userIp || null,
             userAgent: metadata.userAgent || null,
           },
@@ -971,7 +1026,7 @@ class AuthService {
             userId,
             action: "PASSWORD_CHANGE",
             resource: "auth",
-            details: "User changed their password",
+            details: { message: "User changed their password" },
             ipAddress: metadata?.userIp || null,
             userAgent: metadata?.userAgent || null,
           },
@@ -1070,7 +1125,7 @@ class AuthService {
     }
 
     try {
-      const updatedUser = await prisma.user.$transaction(async tx => {
+      const updatedUser = await prisma.$transaction(async tx => {
         const user = await tx.user.update({
           where: { id: userId },
           data: updateData,
@@ -1093,7 +1148,11 @@ class AuthService {
               userId,
               action: "EMAIL_CHANGE",
               resource: "user",
-              details: `User changed their email to ${updateData.email} from ${currentUser.email}`,
+              details: {
+                message: `User changed their email to ${updateData.email} from ${currentUser.email}`,
+                previousEmail: currentUser.email,
+                newEmail: updateData.email,
+              },
               ipAddress: metadata?.userIp || null,
               userAgent: metadata?.userAgent || null,
             },
@@ -1109,7 +1168,7 @@ class AuthService {
       return updatedUser;
     } catch (error) {
       if (error instanceof ApiError) throw error;
-      if(error?.code === "P2002") {
+      if (error?.code === "P2002") {
         throw ApiError.conflict("Username or email is already in use.");
       }
       logger.error("Error updating user profile", { userId, error });

@@ -422,7 +422,7 @@ router.post(
  * @swagger
  * /auth/logout:
  *   post:
- *    summary: Logout the current user
+ *    summary: Logout the currently authenticated user
  *    description: This endpoint allows the currently authenticated user to log out by invalidating their refresh token. The user must provide a valid refresh token in the request body. Upon successful logout, the refresh token will be revoked, and the user will need to log in again to obtain new tokens.
  *    tags: [Authentication]
  *    requestBody:
@@ -436,7 +436,6 @@ router.post(
  *              refreshToken:
  *                type: string
  *                example: "refresh_token_here"
- *    responses:
  *    responses:
  *      200:
  *        description: Logout successful. The refresh token has been revoked, and the user is logged out.
@@ -456,13 +455,13 @@ router.post(
  *        content:
  *          application/json:
  *            schema:
- *              ref: '#/components/schemas/ApiValidationError'
+ *              $ref: '#/components/schemas/ApiValidationError'
  *      429:
  *        description: Too many requests. Please try again later.
  *        content:
  *          application/json:
  *            schema:
- *              ref: '#/components/schemas/ApiError'
+ *              $ref: '#/components/schemas/ApiError'
  */
 router.post(
   "/logout",
@@ -475,7 +474,7 @@ router.post(
  * @swagger
  * /auth/logout-all:
  *   post:
- *    summary: Logout the current user from all sessions
+ *    summary: Logout the currently authenticated user from all sessions
  *    description: This endpoint allows the currently authenticated user to log out from all sessions by invalidating all their refresh tokens. Upon successful logout, all active sessions for the user will be terminated, and they will need to log in again to obtain new tokens.
  *    tags: [Authentication]
  *    responses:
@@ -484,13 +483,13 @@ router.post(
  *        content:
  *          application/json:
  *            schema:
- *              ref: '#/components/schemas/ApiSuccess'
+ *              $ref: '#/components/schemas/ApiSuccess'
  *      429:
  *        description: Too many requests. Please try again later.
  *        content:
  *          application/json:
  *            schema:
- *              ref: '#/components/schemas/ApiError'
+ *              $ref: '#/components/schemas/ApiError'
  */
 router.post("/logout-all", protect, authController.logoutAll);
 
@@ -508,8 +507,8 @@ router.post("/logout-all", protect, authController.logoutAll);
  *          application/json:
  *            schema:
  *              allOf:
- *                ref: '#/components/schemas/ApiSuccess'
- *                type: object
+ *                - $ref: '#/components/schemas/ApiSuccess'
+ *                - type: object
  *                  properties:
  *                    data:
  *                      type: object
@@ -520,13 +519,13 @@ router.post("/logout-all", protect, authController.logoutAll);
  *        content:
  *          application/json:
  *            schema:
- *              ref: '#/components/schemas/ApiValidationError'
+ *              $ref: '#/components/schemas/ApiValidationError'
  *      429:
  *        description: Too many requests. Please try again later.
  *        content:
  *          application/json:
  *            schema:
- *              ref: '#/components/schemas/ApiError'
+ *              $ref: '#/components/schemas/ApiError'
  */
 router.get("/me", protect, authController.getCurrentUser);
 
@@ -570,13 +569,13 @@ router.get("/me", protect, authController.getCurrentUser);
  *        content:
  *          application/json:
  *            schema:
- *              ref: '#/components/schemas/ApiValidationError'
+ *              $ref: '#/components/schemas/ApiValidationError'
  *      429:
  *        description: Too many requests. Please try again later.
  *        content:
  *          application/json:
  *            schema:
- *              ref: '#/components/schemas/ApiError'
+ *              $ref: '#/components/schemas/ApiError'
  */
 router.post(
   "/change-password",
@@ -599,7 +598,6 @@ router.post(
  *        application/json:
  *          schema:
  *            type: object
- *            required: [username, email, fullName]
  *            properties:
  *              username:
  *                type: string
@@ -613,9 +611,9 @@ router.post(
  *        content:
  *          application/json:
  *            schema:
- *              allOf:
- *                ref: '#/components/schemas/ApiSuccess'
- *                type: object
+ *             allOf:
+ *                - $ref: '#/components/schemas/ApiSuccess'
+ *                - type: object
  *                  properties:
  *                    data:
  *                     $ref: '#/components/schemas/User'
@@ -624,19 +622,19 @@ router.post(
  *        content:
  *          application/json:
  *            schema:
- *              ref: '#/components/schemas/ApiValidationError'
+ *              $ref: '#/components/schemas/ApiValidationError'
  *      409:
  *        description: Conflict. This resource already exists.
  *        content:
  *          application/json:
  *            schema:
- *              ref: '#/components/schemas/ApiError'
+ *              $ref: '#/components/schemas/ApiError'
  *      429:
  *        description: Too many requests. Please try again later.
  *        content:
  *          application/json:
  *            schema:
- *              ref: '#/components/schemas/ApiError'
+ *              $ref: '#/components/schemas/ApiError'
  */
 router.patch(
   "/me",

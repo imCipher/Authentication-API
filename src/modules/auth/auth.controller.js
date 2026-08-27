@@ -218,4 +218,5 @@ export default {
   logoutAll,
   getCurrentUser,
   changePassword,
+  updateProfile,
 };

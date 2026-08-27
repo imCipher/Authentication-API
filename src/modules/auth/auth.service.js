@@ -474,27 +474,35 @@ class AuthService {
   }
 
   /**
-   * Retrieves a user by their ID and role.
+   * Retrieves a user by their ID, optionally verifying their role.
    *
    * @param {string} userId - The ID of the user to retrieve.
-   * @param {string} role - The role of the user to retrieve.
+   * @param {string} [role] - The role of the user to retrieve.
    * @returns {Promise<Object|null>} - The user object if found, otherwise null.
    */
-  async getUserById(userId, role) {
+  async getUserById(userId, role = null) {
+    if (!userId || typeof userId !== "string") {
+      return null; // Return null if userId is not provided or not a string
+    }
+
+    const where = { id: userId };
+    if (role) {
+      where.role = role;
+    }
+
     const user = await prisma.user.findFirst({
-      where: {
-        id: userId,
-        role,
-      },
+      where,
       select: {
         id: true,
         fullName: true,
         username: true,
         email: true,
         role: true,
+        status: true,
         emailVerified: true,
-        createdAt: true,
+        lastLoginAt: true,
         passwordChangedAt: true,
+        createdAt: true,
       },
     });
     return user;

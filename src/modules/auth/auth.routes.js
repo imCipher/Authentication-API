@@ -494,4 +494,40 @@ router.post(
  */
 router.post("/logout-all", protect, authController.logoutAll);
 
+/**
+ * @swagger
+ * /auth/me:
+ *   get:
+ *    summary: Get current user information
+ *    description: This endpoint allows the currently authenticated user to retrieve their own user information. The user must be logged in and provide a valid access token in the request headers or cookies. Upon successful authentication, the user's information will be returned.
+ *    tags: [Authentication]
+ *    responses:
+ *      200:
+ *        description: Successful response description
+ *        content:
+ *          application/json:
+ *            schema:
+ *              allOf:
+ *                ref: '#/components/schemas/ApiSuccess'
+ *                type: object
+ *                  properties:
+ *                    data:
+ *                      type: object
+ *                      properties:
+ *                        $ref: '#/components/schemas/User'
+ *      400:
+ *        description: Bad request. Please check your input.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiValidationError'
+ *      429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiError'
+ */
+router.get("/me", protect, authController.getCurrentUser);
+
 export default router;

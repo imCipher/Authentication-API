@@ -163,6 +163,17 @@ const logoutAll = CatchAsync(async (req, res, next) => {
   ApiResponse.success(res, "Logged out from all sessions successfully.");
 });
 
+/**
+ * @route GET /api/v1/auth/me
+ * @desc Get the currently authenticated user's information
+ * @access Private
+ */
+const getCurrentUser = CatchAsync(async (req, res, next) => {
+  const { passwordChangedAt, ...user } = req.user;
+
+  ApiResponse.success(res, "Current user retrieved successfully.", { user });
+});
+
 export default {
   register,
   login,
@@ -172,5 +183,6 @@ export default {
   forgotPassword,
   resetPassword,
   logout,
-  logoutAll
+  logoutAll,
+  getCurrentUser,
 };

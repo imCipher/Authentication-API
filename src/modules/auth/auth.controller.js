@@ -174,6 +174,38 @@ const getCurrentUser = CatchAsync(async (req, res, next) => {
   ApiResponse.success(res, "Current user retrieved successfully.", { user });
 });
 
+/**
+ * @route POST /api/v1/auth/change-password
+ * @desc Change the password of the currently authenticated user
+ * @access Private
+ */
+const changePassword = CatchAsync(async (req, res, next) => {
+  const { currentPassword, newPassword } = req.validated.body;
+  const { id } = req.user;
+  await AuthService.changePassword(id, currentPassword, newPassword);
+
+  ApiResponse.success(res, "Password changed successfully.");
+});
+
+/**
+ * @route PATCH /api/v1/auth/me
+ * @desc Update the profile of the currently authenticated user
+ * @access Private
+ */
+const updateProfile = CatchAsync(async (req, res, next) => {
+  const { fullName, username, email } = req.validated.body;
+  const { id } = req.user;
+  const updatedUser = await AuthService.updateProfile(id, {
+    fullName,
+    username,
+    email,
+  });
+
+  ApiResponse.success(res, "Profile updated successfully.", {
+    user: updatedUser,
+  });
+});
+
 export default {
   register,
   login,
@@ -185,4 +217,5 @@ export default {
   logout,
   logoutAll,
   getCurrentUser,
+  changePassword,
 };

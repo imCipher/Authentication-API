@@ -906,6 +906,218 @@ class AuthService {
       });
     }
   }
+
+  /**
+   * Changes a user's password after verifying the current password.
+   *
+   * @param {string} userId - The ID of the user whose password is to be changed.
+   * @param {string} currentPassword - The current password of the user.
+   * @param {string} newPassword - The new password to be set for the user.
+   * @param {Object} [metadata] - Metadata about the user Ip and  user agent.
+   * @returns {Promise<void>} - A promise that resolves when the password is successfully changed.
+   */
+  async changePassword(userId, currentPassword, newPassword, metadata = {}) {
+    if (currentPassword === newPassword) {
+      throw ApiError.badRequest(
+        "New password cannot be the same as the current password.",
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { passwordHash: true, status: true },
+    });
+
+    if (user.status !== "ACTIVE") {
+      throw ApiError.badRequest("User account is inactive or not found.");
+    }
+
+    if (!user.passwordHash) {
+      throw ApiError.badRequest(
+        "This account was created via social login and does not have a password set.",
+      );
+    }
+
+    if (
+      !(await hashUtils.comparePassword(user.passwordHash, currentPassword))
+    ) {
+      throw ApiError.badRequest("Current password is incorrect.");
+    }
+
+    const newPasswordHash = await hashUtils.hashPassword(newPassword);
+
+    try {
+      await prisma.$transaction(async tx => {
+        // Use Db clock so passwordChangedAt shares a time domain with refreshToken.createdAt
+        const [{ now: dbNow }] = await tx.$queryRaw`SELECT NOW() AS now`;
+
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            passwordHash: newPasswordHash,
+            passwordChangedAt: dbNow,
+          },
+        });
+        await tx.refreshToken.updateMany({
+          where: { userId, revokedAt: null },
+          data: { revokedAt: dbNow, graceToken: null },
+        });
+        await tx.refreshToken.updateMany({
+          where: { userId, graceToken: { not: null } },
+          data: { graceToken: null },
+        });
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: "PASSWORD_CHANGE",
+            resource: "auth",
+            details: "User changed their password",
+            ipAddress: metadata?.userIp || null,
+            userAgent: metadata?.userAgent || null,
+          },
+        });
+      });
+      logger.info("Password changed successfully", { userId });
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      logger.error("Error during password change process", { userId, error });
+      throw ApiError.internal("An error occurred while changing the password", {
+        cause: error,
+      });
+    }
+  }
+
+  /**
+   * Updates a user's profile information, including full name, username, and email.
+   *
+   * @param {string} userId - The ID of the user whose profile is to be updated.
+   * @param {Object} profileData - An object containing the new profile data.
+   * @param {string} [profileData.fullName] - The new full name of the user.
+   * @param {string} [profileData.username] - The new username of the user.
+   * @param {string} [profileData.email] - The new email address of the user.
+   * @returns {Promise<Object>} - The updated sanitized user object.
+   */
+  async updateUserProfile(userId, profileData, metadata = {}) {
+    if (!userId || typeof userId !== "string") {
+      throw ApiError.badRequest("Invalid user ID provided.");
+    }
+    const { fullName, username, email } = profileData;
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        fullName: true,
+        status: true,
+      },
+    });
+
+    if (!currentUser || currentUser.status !== "ACTIVE") {
+      throw ApiError.notFound("User not found or account is inactive.");
+    }
+
+    const updateData = {};
+    let emailChanged = false;
+
+    if (fullName !== undefined && fullName.trim() !== currentUser.fullName) {
+      updateData.fullName = fullName.trim();
+    }
+
+    if (
+      username !== undefined &&
+      username.toLowerCase().trim() !== currentUser.username
+    ) {
+      updateData.username = username.toLowerCase().trim();
+    }
+
+    if (
+      email !== undefined &&
+      email.toLowerCase().trim() !== currentUser.email
+    ) {
+      updateData.email = email.toLowerCase().trim();
+      updateData.emailVerified = false; // Mark email as unverified if changed
+      emailChanged = true;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return currentUser; // No changes to update
+    }
+    const uniqueChecks = [];
+    if (updateData.username)
+      uniqueChecks.push({ username: updateData.username });
+    if (updateData.email) uniqueChecks.push({ email: updateData.email });
+
+    if (uniqueChecks.length > 0) {
+      const conflictUser = await prisma.user.findFirst({
+        where: {
+          OR: uniqueChecks,
+          NOT: { id: userId },
+        },
+        select: { username: true, email: true },
+      });
+      if (conflictUser) {
+        if (conflictUser.username === updateData.username) {
+          throw ApiError.conflict("Username is already taken");
+        }
+        if (conflictUser.email === updateData.email) {
+          throw ApiError.conflict(
+            "Email is already registered by another user.",
+          );
+        }
+      }
+    }
+
+    try {
+      const updatedUser = await prisma.user.$transaction(async tx => {
+        const user = await tx.user.update({
+          where: { id: userId },
+          data: updateData,
+          select: {
+            id: true,
+            fullName: true,
+            username: true,
+            email: true,
+            role: true,
+            status: true,
+            emailVerified: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        if (emailChanged) {
+          await tx.auditLog.create({
+            data: {
+              userId,
+              action: "EMAIL_CHANGE",
+              resource: "user",
+              details: `User changed their email to ${updateData.email} from ${currentUser.email}`,
+              ipAddress: metadata?.userIp || null,
+              userAgent: metadata?.userAgent || null,
+            },
+          });
+        }
+
+        return user;
+      });
+      if (emailChanged) {
+        await this.resendVerificationEmail(updatedUser.email);
+      }
+      logger.info("User profile updated successfully", { userId });
+      return updatedUser;
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      if(error?.code === "P2002") {
+        throw ApiError.conflict("Username or email is already in use.");
+      }
+      logger.error("Error updating user profile", { userId, error });
+      throw ApiError.internal("An error occurred while updating the profile", {
+        cause: error,
+      });
+    }
+  }
 }
 
 export default new AuthService();

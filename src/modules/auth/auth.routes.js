@@ -530,4 +530,119 @@ router.post("/logout-all", protect, authController.logoutAll);
  */
 router.get("/me", protect, authController.getCurrentUser);
 
+/**
+ * @swagger
+ * /auth/change-password:
+ *   post:
+ *    summary: Change the current authenticated user's password
+ *    description: This endpoint allows the currently authenticated user to change their password. The user must provide their current password, a new password, and a confirmation of the new password. Upon successful validation and authentication, the user's password will be updated.
+ *    tags: [Authentication]
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required: [currentPassword, newPassword, confirmPassword]
+ *            properties:
+ *              currentPassword:
+ *                type: string
+ *              newPassword:
+ *                type: string
+ *              confirmPassword:
+ *                type: string
+ *    responses:
+ *      200:
+ *        description: Password changed successfully. The user can now log in with the new password.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              type: object
+ *              properties:
+ *                success:
+ *                  type: boolean
+ *                  example: true
+ *                message:
+ *                  type: string
+ *                  example: Password changed successfully, please log in with your new password.
+ *      400:
+ *        description: Bad request. Please check your input.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiValidationError'
+ *      429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiError'
+ */
+router.post(
+  "/change-password",
+  protect,
+  passwordResetRateLimiter,
+  validateRequest(authSchema.changePasswordSchema),
+  authController.changePassword,
+);
+
+/**
+ * @swagger
+ * /auth/me:
+ *   patch:
+ *    summary: Update the authenticated user details
+ *    description: This endpoint allows the currently authenticated user to update their profile information. The user can provide the fields they wish to update, and upon successful validation and authentication, the user's profile will be updated accordingly.
+ *    tags: [Authentication]
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            required: [username, email, fullName]
+ *            properties:
+ *              username:
+ *                type: string
+ *              email:
+ *                type: string
+ *              fullName:
+ *                type: string
+ *    responses:
+ *      200:
+ *        description: Successful response description
+ *        content:
+ *          application/json:
+ *            schema:
+ *              allOf:
+ *                ref: '#/components/schemas/ApiSuccess'
+ *                type: object
+ *                  properties:
+ *                    data:
+ *                     $ref: '#/components/schemas/User'
+ *      400:
+ *        description: Bad request. Please check your input.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiValidationError'
+ *      409:
+ *        description: Conflict. This resource already exists.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiError'
+ *      429:
+ *        description: Too many requests. Please try again later.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              ref: '#/components/schemas/ApiError'
+ */
+router.patch(
+  "/me",
+  protect,
+  validateRequest(authSchema.updateProfileSchema),
+  authController.updateProfile,
+);
+
 export default router;

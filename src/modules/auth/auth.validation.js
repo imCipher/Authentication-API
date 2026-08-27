@@ -34,6 +34,44 @@ const emptyToUndefined = value => {
 };
 
 /**
+ * Reusable primitive schemas
+ */
+const fullNameSchema = z.preprocess(
+  emptyToUndefined,
+  z
+    .string("Full name is required")
+    .trim()
+    .min(2, "Full name must be at least 2 characters long")
+    .max(100, "Full name must not exceed 100 characters")
+    .regex(
+      /^(?=.*\p{L})[\p{L}\p{M}'\-. ]+$/u,
+      "Full name contains invalid characters",
+    ),
+);
+
+/**
+ * Reusable primitive schemas
+ */
+const usernameSchema = z.preprocess(
+  emptyToUndefined,
+  z
+    .string("Username is required")
+    .normalize("NFC")
+    .trim()
+    .toLowerCase()
+    .regex(
+      /^[a-z0-9_]+$/,
+      "Username can only contain letters, numbers, and underscores",
+    )
+    .min(3)
+    .max(30, "Username must be between 3 and 30 characters")
+    .refine(
+      username => !RESERVED_USERNAMES.has(username),
+      "This username is not available. Please choose a different one.",
+    ),
+);
+
+/**
  * Validation schema for email addresses.
  * This schema ensures that the email is a valid string, normalized, trimmed,
  * converted to lowercase, and does not exceed 254 characters. It also checks
@@ -73,30 +111,8 @@ const loginIdentifierSchema = z.preprocess(
 const registerSchema = {
   body: z
     .object({
-      fullName: z
-        .string("Full name is required")
-        .trim()
-        .min(2, "Full name must be at least 2 characters long")
-        .max(100, "Full name must not exceed 100 characters")
-        .regex(
-          /^(?=.*\p{L})[\p{L}\p{M}'\-. ]+$/u,
-          "Full name contains invalid characters",
-        ),
-      username: z
-        .string("Username is required")
-        .normalize("NFC")
-        .trim()
-        .toLowerCase()
-        .regex(
-          /^[a-z0-9_]+$/,
-          "Username can only contain letters, numbers, and underscores",
-        )
-        .min(3)
-        .max(30, "Username must be between 3 and 30 characters")
-        .refine(
-          username => !RESERVED_USERNAMES.has(username),
-          "This username is not available. Please choose a different one.",
-        ),
+      fullNameSchema,
+      usernameSchema,
       email: emailSchema,
       password: z
         .string("Password is required")
@@ -207,6 +223,85 @@ const resetPasswordSchema = {
     .strict(),
 };
 
+/**
+ * Validation schema for changing passwords.
+ * This schema ensures that the current password, new password, and confirmation of the new password are provided and meet the specified criteria.
+ */
+const changePasswordSchema = {
+  body: z
+    .object({
+      currentPassword: z
+        .string("Password is required")
+        .normalize("NFC")
+        .min(8, "Password must be at least 8 characters long")
+        .max(72, "Password must not exceed 72 characters")
+        .regex(
+          /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).*$/,
+          "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+        ),
+      newPassword: z
+        .string("Password is required")
+        .normalize("NFC")
+        .min(8, "Password must be at least 8 characters long")
+        .max(72, "Password must not exceed 72 characters")
+        .regex(
+          /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).*$/,
+          "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+        ),
+      confirmNewPassword: z
+        .string("Confirm password is required")
+        .normalize("NFC"),
+    })
+    .refine(data => data.newPassword === data.confirmNewPassword, {
+      message: "Passwords do not match",
+    }),
+};
+
+/**
+ * Validation schema for updating user profile information.
+ * This schema ensures that the provided profile data meets the specified criteria.
+ */
+const updateProfileSchema = {
+  body: z
+    .object({
+      username: z
+        .string("Username is required")
+        .normalize("NFC")
+        .trim()
+        .toLowerCase()
+        .regex(
+          /^[a-z0-9_]+$/,
+          "Username can only contain letters, numbers, and underscores",
+        )
+        .min(3)
+        .max(30, "Username must be between 3 and 30 characters")
+        .refine(
+          username => !RESERVED_USERNAMES.has(username),
+          "This username is not available. Please choose a different one.",
+        )
+        .optional(),
+      email: emailSchema.optional(),
+      fullName: z
+        .string("Full name is required")
+        .trim()
+        .min(2, "Full name must be at least 2 characters long")
+        .max(100, "Full name must not exceed 100 characters")
+        .regex(
+          /^(?=.*\p{L})[\p{L}\p{M}'\-. ]+$/u,
+          "Full name contains invalid characters",
+        )
+        .optional(),
+    })
+    .strict("Unexpected fields in update request")
+    .refine(
+      data =>
+        data.fullName !== undefined ||
+        data.username !== undefined ||
+        data.email !== undefined,
+      "At least one field (fullName, username, or email) must be provided for update",
+    ),
+};
+
 export default {
   registerSchema,
   loginSchema,
@@ -215,4 +310,6 @@ export default {
   refreshTokenSchema,
   verifyEmailSchema,
   resetPasswordSchema,
+  changePasswordSchema,
+  updateProfileSchema,
 };

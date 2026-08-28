@@ -50,6 +50,7 @@ model User {
   emailVerified       Boolean     @default(false)     @map("email_verified")
   lastLoginAt         DateTime?   @map("last_login_at")
   lastLoginIp         String?     @map("last_login_ip")
+  sessionsRevokedAt   DateTime?   @map("sessions_revoked_at")
   passwordChangedAt   DateTime?   @map("password_changed_at")  // jwt issued before this time are rejected
   failedAttempts      Int         @default(0) @map("failed_attempts")
   status              UserStatus  @default(ACTIVE)

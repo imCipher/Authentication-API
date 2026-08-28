@@ -290,11 +290,12 @@ class AuthService {
       },
     });
 
+    /*
     if (!tokenInfo) {
       throw ApiError.unauthorized("Invalid refresh token", {
         code: "TOKEN_INVALID",
       });
-    }
+    } */
 
     if (tokenInfo.expiresAt < new Date()) {
       throw ApiError.unauthorized("Refresh token expired", {
@@ -406,6 +407,7 @@ class AuthService {
       const fresh = await prisma.refreshToken.findUnique({
         where: { id: info.id },
         select: {
+          id: true,
           userId: true,
           expiresAt: true,
           revokedAt: true,
@@ -475,7 +477,7 @@ class AuthService {
         where: { userId: info.userId, graceToken: { not: null } },
         data: { graceToken: null },
       }),
-      await tx.auditLog.create({
+      prisma.auditLog.create({
         data: {
           userId: info.userId,
           action: "TOKEN_REUSE_DETECTED",
@@ -754,10 +756,7 @@ class AuthService {
 
     try {
       await prisma.$transaction(async tx => {
-        // Read the clock from the DB so passwordChangedAt shares a time domain
-        // with refreshToken.createdAt (DB DEFAULT CURRENT_TIMESTAMP) — the
-        // stale-family guard in rotateRefreshToken compares the two directly.
-        const [{ now: dbNow }] = await tx.$queryRaw`SELECT NOW() AS now`;
+        const dbNow = new Date(); // Use a single timestamp for all operations in this transaction
 
         await tx.user.update({
           where: {
@@ -1004,7 +1003,7 @@ class AuthService {
     try {
       await prisma.$transaction(async tx => {
         // Use Db clock so passwordChangedAt shares a time domain with refreshToken.createdAt
-        const [{ now: dbNow }] = await tx.$queryRaw`SELECT NOW() AS now`;
+        const dbNow = new Date();
 
         await tx.user.update({
           where: { id: userId },

@@ -111,8 +111,8 @@ const loginIdentifierSchema = z.preprocess(
 const registerSchema = {
   body: z
     .object({
-      fullNameSchema,
-      usernameSchema,
+      fullName: fullNameSchema,
+      username: usernameSchema,
       email: emailSchema,
       password: z
         .string("Password is required")
@@ -264,33 +264,9 @@ const changePasswordSchema = {
 const updateProfileSchema = {
   body: z
     .object({
-      username: z
-        .string("Username is required")
-        .normalize("NFC")
-        .trim()
-        .toLowerCase()
-        .regex(
-          /^[a-z0-9_]+$/,
-          "Username can only contain letters, numbers, and underscores",
-        )
-        .min(3)
-        .max(30, "Username must be between 3 and 30 characters")
-        .refine(
-          username => !RESERVED_USERNAMES.has(username),
-          "This username is not available. Please choose a different one.",
-        )
-        .optional(),
+      username: usernameSchema.optional(),
       email: emailSchema.optional(),
-      fullName: z
-        .string("Full name is required")
-        .trim()
-        .min(2, "Full name must be at least 2 characters long")
-        .max(100, "Full name must not exceed 100 characters")
-        .regex(
-          /^(?=.*\p{L})[\p{L}\p{M}'\-. ]+$/u,
-          "Full name contains invalid characters",
-        )
-        .optional(),
+      fullName: fullNameSchema.optional(),
     })
     .strict("Unexpected fields in update request")
     .refine(

@@ -27,12 +27,14 @@ class AuthService {
   async register(userdata) {
     const { fullName, username, email, password } = userdata;
 
+    // First, check if the username or email already exists in the database
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [{ username }, { email }],
       },
     });
 
+    // If an existing user is found, throw a conflict error with a specific message
     if (existingUser) {
       if (existingUser.username === username) {
         throw ApiError.conflict("Username is already taken");
@@ -42,16 +44,17 @@ class AuthService {
       }
     }
 
-    const start2Db = performance.now();
+    // Hash the user's password before storing it in the database
     const hashedPassword = await hashUtils.hashPassword(password);
-    const end2Db = performance.now();
-    logger.info("Password hashing time: %d ms", end2Db - start2Db);
 
+    // Generate a verification token for email confirmation, hash it, and set an expiry time
     const token = tokenUtils.verificationToken(6);
     let hashToken = tokenUtils.hashToken(token);
     let expiryTime = tokenUtils.expiresAt(5);
 
+    // Use a transaction to create the user and the email verification record atomically
     const user = await prisma.$transaction(async tx => {
+      // Create the new user in the database
       const newUser = await tx.user.create({
         data: {
           email,
@@ -70,6 +73,7 @@ class AuthService {
         },
       });
 
+      // If the user's email is not verified, create an email verification record in the database
       if (!newUser.emailVerified) {
         await tx.emailVerification.create({
           data: {
@@ -82,6 +86,7 @@ class AuthService {
       return newUser;
     });
 
+    // Send the email confirmation asynchronously, logging any errors without blocking the registration process
     new Email(userdata, token).sendEmailConfirmation().catch(error => {
       logger.warn("Email sending failed", { email, error });
     });
@@ -103,6 +108,8 @@ class AuthService {
    */
   async login(loginData, metadata) {
     const { loginIdentifier, password } = loginData;
+
+    // Find the user by email or username, selecting only the necessary fields for authentication
     const user = await prisma.user.findFirst({
       where: {
         OR: [{ email: loginIdentifier }, { username: loginIdentifier }],
@@ -118,13 +125,16 @@ class AuthService {
       },
     });
 
+    // Initialize the failed attempts count based on the user's record, defaulting to 0 if the user is not found
     let failedAttemptsCount = user ? user.failedAttempts : 0;
 
+    // If the user is not found, perform a fake password comparison to prevent timing attacks and throw an unauthorized error
     if (!user) {
       await hashUtils.fakeComparePassword(); // Prevent timing attacks
       throw ApiError.unauthorized("Invalid login credentials");
     }
 
+    // Check the user's status and throw an unauthorized error if the account is deactivated
     if (user.status !== "ACTIVE") {
       await prisma.loginHistory.create({
         data: {
@@ -140,6 +150,7 @@ class AuthService {
       );
     }
 
+    // Check if the user's account is locked and throw an unauthorized error if it is
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       await prisma.loginHistory.create({
         data: {
@@ -155,6 +166,7 @@ class AuthService {
       );
     }
 
+    // Check if the user's email is verified and throw an unauthorized error if it is not
     if (!user.emailVerified) {
       await prisma.loginHistory.create({
         data: {
@@ -170,9 +182,11 @@ class AuthService {
       );
     }
 
+    // If the password is incorrect, increment the failed attempts count and handle account locking if necessary
     if (!(await hashUtils.comparePassword(user.passwordHash, password))) {
       failedAttemptsCount++;
 
+      // Lock the account if the failed attempts exceed the threshold and the user is not an admin
       if (failedAttemptsCount >= 5 && user.role !== "ADMIN") {
         const lockDuration = 15 * 60 * 1000; // 15 minutes
         const lockedUntil = new Date(Date.now() + lockDuration);
@@ -198,11 +212,14 @@ class AuthService {
           "Account is temporarily locked due to multiple failed login attempts. Please try again later.",
         );
       }
+
+      // Update the failed attempts count in the user's record and log the failed login attempt
       await prisma.user.update({
         where: { id: user.id },
         data: { failedAttempts: failedAttemptsCount },
       });
 
+      // Log the failed login attempt in the login history
       await prisma.loginHistory.create({
         data: {
           userId: user.id,
@@ -215,9 +232,11 @@ class AuthService {
       throw ApiError.unauthorized("Invalid login credentials");
     }
 
+    // If the login is successful, reset the failed attempts count and update the user's last login information
     const accessToken = await this.generateAccessToken(user);
     const { refreshToken } = await this.generateRefreshToken(user.id, metadata);
 
+    // Log the successful login attempt and update the user's last login information in a transaction
     await prisma.$transaction(async tx => {
       await tx.loginHistory.create({
         data: {

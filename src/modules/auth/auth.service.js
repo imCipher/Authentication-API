@@ -7,6 +7,7 @@ import hashUtils from "../../utils/hash.utils.js";
 import tokenUtils from "../../utils/token.utils.js";
 import Email from "../../utils/email.utils.js";
 import finalConfig from "../../config/keys.js";
+import redisService from "../../config/redis.js";
 
 /**
  * Service class for handling user-related business logic.
@@ -531,6 +532,7 @@ class AuthService {
         emailVerified: true,
         lastLoginAt: true,
         passwordChangedAt: true,
+        sessionsRevokedAt: true,
         createdAt: true,
       },
     });
@@ -843,11 +845,26 @@ class AuthService {
    * This method ensures that the user's session is terminated and prevents further use of the refresh token for obtaining new access tokens.
    * @param {string} userId - The ID of the user to log out.
    * @param {string} refreshToken - The refresh token to be revoked.
+   * @param {Object} decoded - The decoded JWT token info to be used for revocation.
    * @returns {Promise<void>} - A promise that resolves when the logout process is complete.
    * @throws {ApiError} - Throws an error if the logout process fails due to database issues or other unexpected errors.
    */
-  async logout(userId, refreshToken) {
+  async logout(userId, refreshToken, decoded) {
     const hashedToken = tokenUtils.hashToken(refreshToken);
+
+    const remainingTtlSeconds = Math.max(
+      0,
+      decoded.exp - Math.floor(Date.now() / 1000),
+    );
+
+    if (remainingTtlSeconds > 0 && decoded.jti) {
+      //Set key with auto-expiry equal to token's remaining TTL to prevent reuse of the same token
+      await redisService.set(
+        `denylist:${decoded.jti}`,
+        "revoked",
+        remainingTtlSeconds,
+      );
+    }
 
     try {
       await prisma.$transaction(async tx => {

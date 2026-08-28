@@ -11,10 +11,18 @@ import finalConfig from "../config/keys.js";
  * @returns {string} - Signed JWT with minimal claims
  */
 const signAccessToken = ({ id, role }) => {
-  return jwt.sign({ sub: id, role }, finalConfig.jwt.accessSecret, {
-    expiresIn: finalConfig.jwt.accessExpiresIn,
-    algorithm: "HS256",
-  });
+  return jwt.sign(
+    {
+      sub: id,
+      role,
+      jti: crypto.randomUUID(),
+    },
+    finalConfig.jwt.accessSecret,
+    {
+      expiresIn: finalConfig.jwt.accessExpiresIn,
+      algorithm: "HS256",
+    },
+  );
 };
 
 /**

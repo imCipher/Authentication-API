@@ -2,6 +2,7 @@ import tokenUtils from "../utils/token.utils.js";
 import ApiError from "../utils/ApiError.js";
 import authService from "../modules/auth/auth.service.js";
 import CatchAsync from "../utils/catchasync.js";
+import redisService from "../config/redis.js";
 
 /**
  * Middleware to protect routes and ensure that the user is authenticated.
@@ -34,6 +35,20 @@ export const protect = CatchAsync(async (req, res, next) => {
 
   const decoded = await tokenUtils.verifyAccessToken(token);
 
+  // Check if the token is in the denylist
+  const isRevoked = await redisService.exists(`denylist:${decoded.jti}`);
+
+  if (isRevoked) {
+    return next(
+      ApiError.unauthorized(
+        "This token has been revoked. Please log in again.",
+        {
+          code: "TOKEN_REVOKED",
+        },
+      ),
+    );
+  }
+
   const currentUser = await authService.getUserById(decoded.sub, decoded.role);
 
   if (!currentUser) {
@@ -54,6 +69,17 @@ export const protect = CatchAsync(async (req, res, next) => {
     }
   }
 
+  if (currentUser.sessionsRevokedAt) {
+    if (decoded.iat < currentUser.sessionsRevokedAt.getTime() / 1000) {
+      return next(
+        ApiError.unauthorized(
+          "You have logged out from all sessions. Please log in again.",
+        ),
+      );
+    }
+  }
+
   req.user = currentUser;
+  req.token = decoded;
   next();
 });

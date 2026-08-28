@@ -146,8 +146,10 @@ const resetPassword = CatchAsync(async (req, res, next) => {
  */
 const logout = CatchAsync(async (req, res, next) => {
   const { refreshToken } = req.validated.body;
+  const decoded = req.token;
+  console.log("JTI in logout controller:", decoded.jti);
   const { id } = req.user;
-  await AuthService.logout(id, refreshToken);
+  await AuthService.logout(id, refreshToken, decoded);
 
   ApiResponse.success(res, "Logout successful.");
 });

@@ -935,7 +935,7 @@ class AuthService {
 
     try {
       await prisma.$transaction(async tx => {
-        // Find all active refresh tokens for the user
+        // Find all active refresh tokens for the user and revoke them
         await tx.refreshToken.updateMany({
           where: {
             userId,
@@ -955,6 +955,13 @@ class AuthService {
           },
           data: {
             graceToken: null,
+          },
+        });
+
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            sessionRevokedAt: new Date(),
           },
         });
 

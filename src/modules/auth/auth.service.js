@@ -287,6 +287,8 @@ class AuthService {
    */
   async rotateRefreshToken(refreshToken, { userIp, userAgent }) {
     const hashedToken = tokenUtils.hashToken(refreshToken);
+
+    // Look up the refresh token in the database, selecting relevant fields for validation and rotation
     const tokenInfo = await prisma.refreshToken.findFirst({
       where: {
         tokenHash: hashedToken,
@@ -318,6 +320,7 @@ class AuthService {
       });
     } */
 
+    // Check if the refresh token has expired and throw an unauthorized error if it has
     if (tokenInfo.expiresAt < new Date()) {
       throw ApiError.unauthorized("Refresh token expired", {
         code: "TOKEN_EXPIRED",
@@ -337,6 +340,7 @@ class AuthService {
       });
     }
 
+    // A session revoke kills every family minted before it. Rejecting rows older than the session revoke time.
     if (
       tokenInfo.user.sessionsRevokedAt &&
       tokenInfo.createdAt < tokenInfo.user.sessionsRevokedAt

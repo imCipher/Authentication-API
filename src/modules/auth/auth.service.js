@@ -825,7 +825,7 @@ class AuthService {
 
         await tx.auditLog.create({
           data: {
-            userId,
+            userId: resetRecord.userId,
             action: "PASSWORD_RESET",
             resource: "auth",
             details: {

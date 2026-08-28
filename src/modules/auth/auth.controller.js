@@ -173,7 +173,7 @@ const logoutAll = CatchAsync(async (req, res, next) => {
  * @access Private
  */
 const getCurrentUser = CatchAsync(async (req, res, next) => {
-  const { passwordChangedAt, ...user } = req.user;
+  const { passwordChangedAt, sessionsRevokedAt, ...user } = req.user;
 
   ApiResponse.success(res, "Current user retrieved successfully.", { user });
 });

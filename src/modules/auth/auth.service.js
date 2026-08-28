@@ -286,6 +286,7 @@ class AuthService {
             id: true,
             role: true,
             passwordChangedAt: true,
+            sessionsRevokedAt: true,
           },
         },
       },
@@ -311,6 +312,15 @@ class AuthService {
     if (
       tokenInfo.user.passwordChangedAt &&
       tokenInfo.createdAt < tokenInfo.user.passwordChangedAt
+    ) {
+      throw ApiError.unauthorized("Invalid refresh token", {
+        code: "TOKEN_INVALID",
+      });
+    }
+
+    if (
+      tokenInfo.user.sessionsRevokedAt &&
+      tokenInfo.createdAt < tokenInfo.user.sessionsRevokedAt
     ) {
       throw ApiError.unauthorized("Invalid refresh token", {
         code: "TOKEN_INVALID",
@@ -622,7 +632,7 @@ class AuthService {
 
       await tx.auditLog.create({
         data: {
-          userId,
+          userId: verificationRecord.userId,
           action: "EMAIL_VERIFIED",
           resource: "auth",
           details: {
@@ -1116,6 +1126,7 @@ class AuthService {
     ) {
       updateData.email = email.toLowerCase().trim();
       updateData.emailVerified = false; // Mark email as unverified if changed
+      updateData.sessionsRevokedAt = new Date(); // Revoke all sessions if email is changed
       emailChanged = true;
     }
 

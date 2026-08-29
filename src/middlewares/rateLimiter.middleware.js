@@ -76,7 +76,10 @@ const createRateLimiterWithFallback = ({
 
   return (req, res, next) => {
     // Bypass rate limiting in testing environment
-    if (finalConfig.env === "testing" || finalConfig.env === "test") {
+    if (
+      (finalConfig.env === "testing" || finalConfig.env === "test" ||
+      finalConfig.env === "development")
+    ) {
       return next();
     }
 

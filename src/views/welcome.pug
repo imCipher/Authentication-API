@@ -1,0 +1,16 @@
+extends baseEmail
+
+block content
+  p Hi #{firstName},
+  p Welcome to Test Auth!, we're excited to have you on board.
+  p If you need assistance setting up your account or have any questions, feel free to reach out to our support team.
+  table.btn.btn-primary(role='presentation', border='0', cellpadding='0', cellspacing='0')
+    tbody
+      tr
+        td(align='left')
+          table(role='presentation', border='0', cellpadding='0', cellspacing='0')
+            tbody
+              tr
+                td
+                  a(href=`#`, target='_blank') Support Team
+  p If you didn't register for this, please ignore this email!

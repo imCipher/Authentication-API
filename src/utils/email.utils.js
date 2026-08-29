@@ -75,6 +75,10 @@ class Email {
     await this.send("register", "Confirm your email address");
   }
 
+  async sendWelcomeEmail() {
+    await this.send("welcome", "Welcome to Test Auth!");
+  }
+
   // Sends a password reset email.
   async sendPasswordReset(urlCode) {
     await this.send("resetpassword", "Reset your password", urlCode);

@@ -15,6 +15,7 @@ import redisService from "../config/redis.js";
  * it throws a 401 unauthorized error.
  */
 export const protect = CatchAsync(async (req, res, next) => {
+  // Check for the presence of an access token in cookies or authorization headers
   let token;
   if (req.cookies && req.cookies.accessToken) {
     token = req.cookies.accessToken;
@@ -25,6 +26,7 @@ export const protect = CatchAsync(async (req, res, next) => {
     token = req.headers.authorization.split(" ")[1];
   }
 
+  // If no token is found, return a 401 unauthorized error
   if (!token) {
     return next(
       ApiError.unauthorized(
@@ -33,11 +35,13 @@ export const protect = CatchAsync(async (req, res, next) => {
     );
   }
 
+  // Verify the token and decode its payload
   const decoded = await tokenUtils.verifyAccessToken(token);
 
   // Check if the token is in the denylist
   const isRevoked = await redisService.exists(`denylist:${decoded.jti}`);
 
+  // If the token is revoked, return a 401 unauthorized error
   if (isRevoked) {
     return next(
       ApiError.unauthorized(
@@ -49,8 +53,10 @@ export const protect = CatchAsync(async (req, res, next) => {
     );
   }
 
+  // Retrieve the user associated with the token's subject (sub) and role
   const currentUser = await authService.getUserById(decoded.sub, decoded.role);
 
+  // If the user no longer exists, return a 401 unauthorized error
   if (!currentUser) {
     return next(
       ApiError.unauthorized(
@@ -59,6 +65,7 @@ export const protect = CatchAsync(async (req, res, next) => {
     );
   }
 
+  // Check if the user has changed their password after the token was issued
   if (currentUser.passwordChangedAt) {
     if (decoded.iat < currentUser.passwordChangedAt.getTime() / 1000) {
       return next(
@@ -69,6 +76,7 @@ export const protect = CatchAsync(async (req, res, next) => {
     }
   }
 
+  // Check if the user has revoked all sessions after the token was issued
   if (currentUser.sessionsRevokedAt) {
     if (decoded.iat < currentUser.sessionsRevokedAt.getTime() / 1000) {
       return next(
@@ -79,6 +87,7 @@ export const protect = CatchAsync(async (req, res, next) => {
     }
   }
 
+  // Attach the user and token to the request object for downstream middleware and route handlers
   req.user = currentUser;
   req.token = decoded;
   next();

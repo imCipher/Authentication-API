@@ -1,4 +1,4 @@
-import rateLimit, {ipKeyGenerator} from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
 
 import logger from "../config/logger.js";
@@ -46,7 +46,7 @@ const createRateLimiterWithFallback = ({
     passOnStoreError: true, // Fail open if the store errors mid-flight
 
     // Custom key generator to use user id if authenticated, otherwise fallback to IP address
-    keyGenerator: (req) => {
+    keyGenerator: req => {
       if (req.user && req.user.id) {
         return `user:${req.user.id}`;
       }
@@ -85,8 +85,9 @@ const createRateLimiterWithFallback = ({
   return (req, res, next) => {
     // Bypass rate limiting in testing and development environments
     if (
-      (finalConfig.env === "testing" || finalConfig.env === "test" ||
-      finalConfig.env === "development")
+      finalConfig.env === "testing" ||
+      finalConfig.env === "test" ||
+      finalConfig.env === "development"
     ) {
       return next();
     }
@@ -198,6 +199,44 @@ export const oauthExchangeRateLimiter = createRateLimiterWithFallback({
     "Too many OAuth exchange attempts from this IP, please try again later.",
 });
 
+/**
+ * Admin Read / Browse Rate Limiter (for GET /admin/user && GET /admin/audit-logs routes)
+ * Moderate - these routes are read-only but can be abused for enumeration or scraping
+ */
+export const adminReadRateLimiter = createRateLimiterWithFallback({
+  storePrefix: "rl:admin-read:",
+  label: "admin-read",
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per 15 minutes per IP
+  message: "Too many admin read requests from this IP, please try again later.",
+});
+
+/**
+ * Admin sensitive mutations Rate Limiter (for PATCH /admin/user/:id/role, PATCH /admin/user/:id/status, DELETE /admin/user/:id routes)
+ * Strict - these routes are sensitive and can be abused for privilege escalation or account deletion
+ */
+export const adminSensitiveMutationRateLimiter = createRateLimiterWithFallback({
+  storePrefix: "rl:admin-sensitive-mutation:",
+  label: "admin-sensitive-mutation",
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 requests per 15 minutes per IP
+  message:
+    "Too many admin sensitive mutation requests from this IP, please try again later.",
+});
+
+/**
+ * Admin Heavy Maintenance Tasks Rate Limiter (for POST /admin/maintenance/cleanup route)
+ * Strict - this route is resource-intensive and can be abused for denial-of-service attacks
+ */
+export const adminHeavyMaintenanceRateLimiter = createRateLimiterWithFallback({
+  storePrefix: "rl:admin-heavy-maintenance:",
+  label: "admin-heavy-maintenance",
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 requests per 15 minutes per IP
+  message:
+    "Too many admin heavy maintenance requests from this IP, please try again later.",
+});
+
 export default {
   registerRateLimiter,
   authRateLimiter,
@@ -205,4 +244,7 @@ export default {
   passwordResetRateLimiter,
   generalRateLimiter,
   oauthExchangeRateLimiter,
+  adminReadRateLimiter,
+  adminSensitiveMutationRateLimiter,
+  adminHeavyMaintenanceRateLimiter,
 };

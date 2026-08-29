@@ -544,10 +544,12 @@ class AuthService {
    * @returns {Promise<Object|null>} - The user object if found, otherwise null.
    */
   async getUserById(userId, role = null) {
+    // Validate that userId is provided and is a string; return null if not
     if (!userId || typeof userId !== "string") {
       return null; // Return null if userId is not provided or not a string
     }
 
+    // Build the query conditionally based on whether a role is provided, and retrieve the user from the database
     const where = { id: userId };
     if (role) {
       where.role = role;
@@ -624,7 +626,10 @@ class AuthService {
    * @throws {ApiError} - Throws a 400 bad request error if the token is invalid or has expired.
    */
   async verifyEmail(token, metadata = {}) {
+    // Hash the provided token
     const hashedToken = tokenUtils.hashToken(token);
+
+    // Look up the email verification record in the database using the hashed token and check if it has expired
     const verificationRecord = await prisma.emailVerification.findFirst({
       where: {
         tokenHash: hashedToken,
@@ -632,12 +637,14 @@ class AuthService {
       },
     });
 
+    // If no valid verification record is found, throw a bad request error indicating that the token is invalid or has expired
     if (!verificationRecord) {
       throw ApiError.badRequest("Token is invalid or  has expired", undefined, {
         code: "TOKEN_INVALID",
       });
     }
 
+    // Use a transaction to update the email verification record, mark the user's email as verified, and create an audit log entry
     await prisma.$transaction(async tx => {
       await tx.emailVerification.update({
         where: { id: verificationRecord.id },
@@ -677,10 +684,12 @@ class AuthService {
    * @returns {Promise<void>} - A promise that resolves when the email is sent.
    */
   async resendVerificationEmail(email) {
+    // Generate a new verification token, hash it, and set an expiry time
     const token = tokenUtils.verificationToken(6);
     const hashedToken = tokenUtils.hashToken(token);
     const expiryTime = tokenUtils.expiresAt(5);
 
+    // Look up the user in the database by email, ensuring that the email is not already verified
     const user = await prisma.user.findFirst({
       where: {
         email,
@@ -693,10 +702,12 @@ class AuthService {
       },
     });
 
+    // If the user is not found or the email is already verified, do nothing and return
     if (!user) {
       return; // If user is not found or already verified, do nothing
     }
 
+    // Use a transaction to delete any existing email verification records for the user and create a new one with the new token
     await prisma.$transaction(async tx => {
       await tx.emailVerification.deleteMany({
         where: { userId: user.id },
@@ -710,6 +721,7 @@ class AuthService {
       });
     });
 
+    // Send the email confirmation asynchronously, logging any errors without blocking the process
     new Email(user, token).sendEmailConfirmation().catch(error => {
       logger.warn("Email sending failed", { email, error });
     });
@@ -722,10 +734,12 @@ class AuthService {
    * @returns {Promise<void>} - A promise that resolves when the password reset email is sent.
    */
   async sendPasswordResetEmail(email) {
+    // Generate a new password reset token, hash it, and set an expiry time
     const token = tokenUtils.secureToken();
     const hashedToken = tokenUtils.hashToken(token);
     const expiryTime = tokenUtils.expiresAt(5);
 
+    // Look up the user in the database by email, selecting only the necessary fields for sending the password reset email
     const user = await prisma.user.findFirst({
       where: {
         email,
@@ -741,6 +755,7 @@ class AuthService {
       return; // Silently return if the user does not exist to prevent email enumeration
     }
 
+    // Use a transaction to delete any existing password reset records for the user and create a new one with the new token
     await prisma.$transaction(async tx => {
       await tx.passwordReset.deleteMany({
         where: { userId: user.id },
@@ -754,6 +769,7 @@ class AuthService {
       });
     });
 
+    // Send the password reset email asynchronously, logging any errors without blocking the process
     new Email(user).sendPasswordReset(token).catch(error => {
       logger.warn("Password reset email sending failed", { email, error });
     });
@@ -768,7 +784,10 @@ class AuthService {
    * @returns {Promise<void>} - A promise that resolves when the password is reset.
    */
   async resetPassword(token, newPassword, metadata = {}) {
+    // Hash the provided token
     const hashedToken = tokenUtils.hashToken(token);
+
+    // Look up the password reset record in the database using the hashed token and check if it has expired or has already been used
     const resetRecord = await prisma.passwordReset.findFirst({
       where: {
         tokenHash: hashedToken,
@@ -781,14 +800,17 @@ class AuthService {
       },
     });
 
+    // If no valid reset record is found or it has already been used, throw a bad request error indicating that the token is invalid or has expired
     if (!resetRecord || resetRecord.usedAt) {
       throw ApiError.badRequest("Token is invalid or has expired", undefined, {
         code: "TOKEN_INVALID",
       });
     }
 
+    // Hash the new password before storing it in the database
     const hashedPassword = await hashUtils.hashPassword(newPassword);
 
+    // Use a transaction to update the user's password, mark the password reset record as used, revoke all active sessions, clear any grace copies, and create an audit log entry
     try {
       await prisma.$transaction(async tx => {
         const dbNow = new Date(); // Use a single timestamp for all operations in this transaction
@@ -811,6 +833,7 @@ class AuthService {
           },
         });
 
+        // If the password reset record was not claimed (i.e., it was already used), throw an error indicating that the token is invalid or has expired
         if (claimed.count === 0) {
           throw ApiError.badRequest(
             "Token is invalid or has expired",
@@ -883,13 +906,16 @@ class AuthService {
    * @throws {ApiError} - Throws an error if the logout process fails due to database issues or other unexpected errors.
    */
   async logout(userId, refreshToken, decoded) {
+    // Hash the provided refresh token
     const hashedToken = tokenUtils.hashToken(refreshToken);
 
+    // Calculate the remaining TTL (time-to-live) in seconds for the token based on its expiration time
     const remainingTtlSeconds = Math.max(
       0,
       decoded.exp - Math.floor(Date.now() / 1000),
     );
 
+    // If the token has a valid remaining TTL and a unique identifier (jti), store it in the Redis denylist to prevent reuse of the same token
     if (remainingTtlSeconds > 0 && decoded.jti) {
       //Set key with auto-expiry equal to token's remaining TTL to prevent reuse of the same token
       await redisService.set(
@@ -899,6 +925,7 @@ class AuthService {
       );
     }
 
+    // Use a transaction to locate the specific refresh token record for the user, revoke it, clear its grace token, and clean up any predecessor grace copies pointing to this revoked token
     try {
       await prisma.$transaction(async tx => {
         // Locate the specific refresh token record for the user
@@ -962,10 +989,12 @@ class AuthService {
    * @throws {ApiError} - Throws an error if the userId is invalid or if the logout process fails due to database issues or other unexpected errors.
    */
   async logoutAll(userId, metadata = {}) {
+    // Validate that userId is provided and is a string; throw an error if not
     if (!userId || typeof userId !== "string") {
       throw ApiError.badRequest("Invalid user ID provided.");
     }
 
+    // Use a transaction to revoke all active refresh tokens for the user, clear any grace copies, update the user's sessionRevokedAt timestamp, and create an audit log entry
     try {
       await prisma.$transaction(async tx => {
         // Find all active refresh tokens for the user and revoke them
@@ -1028,35 +1057,42 @@ class AuthService {
    * @returns {Promise<void>} - A promise that resolves when the password is successfully changed.
    */
   async changePassword(userId, currentPassword, newPassword, metadata = {}) {
+    // Validate the current password and new password inputs
     if (currentPassword === newPassword) {
       throw ApiError.badRequest(
         "New password cannot be the same as the current password.",
       );
     }
 
+    // Look up the user in the database by their ID, selecting only the necessary fields for password verification and status check
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { passwordHash: true, status: true },
     });
 
+    // If the user is not found or their account is inactive, throw a bad request error
     if (user.status !== "ACTIVE") {
       throw ApiError.badRequest("User account is inactive or not found.");
     }
 
+    // If the user does not have a password set (e.g., account created via social login), throw a bad request error
     if (!user.passwordHash) {
       throw ApiError.badRequest(
         "This account was created via social login and does not have a password set.",
       );
     }
 
+    // Verify that the provided current password matches the stored password hash; if not, throw a bad request error
     if (
       !(await hashUtils.comparePassword(user.passwordHash, currentPassword))
     ) {
       throw ApiError.badRequest("Current password is incorrect.");
     }
 
+    // Hash the new password before storing it in the database
     const newPasswordHash = await hashUtils.hashPassword(newPassword);
 
+    // Use a transaction to update the user's password, update the passwordChangedAt timestamp, revoke all active refresh tokens, clear any grace copies, and create an audit log entry
     try {
       await prisma.$transaction(async tx => {
         // Use Db clock so passwordChangedAt shares a time domain with refreshToken.createdAt
@@ -1109,11 +1145,15 @@ class AuthService {
    * @returns {Promise<Object>} - The updated sanitized user object.
    */
   async updateUserProfile(userId, profileData, metadata = {}) {
+    // Validate that userId is provided and is a string; throw an error if not
     if (!userId || typeof userId !== "string") {
       throw ApiError.badRequest("Invalid user ID provided.");
     }
+
+    // Destructure the profileData object to extract the new full name, username, and email values
     const { fullName, username, email } = profileData;
 
+    // Look up the current user in the database by their ID, selecting only the necessary fields for profile update and status check
     const currentUser = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -1125,17 +1165,21 @@ class AuthService {
       },
     });
 
+    // If the user is not found or their account is inactive, throw a not found error
     if (!currentUser || currentUser.status !== "ACTIVE") {
       throw ApiError.notFound("User not found or account is inactive.");
     }
 
+    // Prepare an object to hold the fields to be updated and a flag to track if the email has changed
     const updateData = {};
     let emailChanged = false;
 
+    // Check if the new full name is provided and different from the current full name; if so, add it to the updateData object
     if (fullName !== undefined && fullName.trim() !== currentUser.fullName) {
       updateData.fullName = fullName.trim();
     }
 
+    // Check if the new username is provided and different from the current username; if so, add it to the updateData object
     if (
       username !== undefined &&
       username.toLowerCase().trim() !== currentUser.username
@@ -1143,6 +1187,7 @@ class AuthService {
       updateData.username = username.toLowerCase().trim();
     }
 
+    // Check if the new email is provided and different from the current email; if so, add it to the updateData object, mark the email as unverified, and revoke all sessions
     if (
       email !== undefined &&
       email.toLowerCase().trim() !== currentUser.email
@@ -1153,14 +1198,18 @@ class AuthService {
       emailChanged = true;
     }
 
+    // If there are no changes to update, return the current user object
     if (Object.keys(updateData).length === 0) {
       return currentUser; // No changes to update
     }
+
+    // Check for uniqueness of username and email if they are being updated, and throw a conflict error if either is already taken by another user
     const uniqueChecks = [];
     if (updateData.username)
       uniqueChecks.push({ username: updateData.username });
     if (updateData.email) uniqueChecks.push({ email: updateData.email });
 
+    // Check for uniqueness of username and email if they are being updated
     if (uniqueChecks.length > 0) {
       const conflictUser = await prisma.user.findFirst({
         where: {
@@ -1181,6 +1230,7 @@ class AuthService {
       }
     }
 
+    // Use a transaction to update the user's profile, create an audit log entry if the email has changed, and resend the verification email if necessary
     try {
       const updatedUser = await prisma.$transaction(async tx => {
         const user = await tx.user.update({
@@ -1224,6 +1274,7 @@ class AuthService {
       logger.info("User profile updated successfully", { userId });
       return updatedUser;
     } catch (error) {
+      logger.error("Error updating user profile", { userId, error });
       if (error instanceof ApiError) throw error;
       if (error?.code === "P2002") {
         throw ApiError.conflict("Username or email is already in use.");

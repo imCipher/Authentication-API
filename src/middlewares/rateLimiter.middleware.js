@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, {ipKeyGenerator} from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
 
 import logger from "../config/logger.js";
@@ -7,7 +7,7 @@ import finalConfig from "../config/keys.js";
 import ApiError from "../utils/ApiError.js";
 
 /**
- * Rate limiter factory with Redis-backed and in-memory limiters.
+ * Rate limiter factory for Ip and authenticated user id with Redis-backed and in-memory limiters.
  * - Both limiters are created eagerly at app initialization (module load),
  *   which is required by express-rate-limit (ERR_ERL_CREATED_IN_REQUEST_HANDLER).
  * - The RedisStore is created before Redis connects; its sendCommand waits for
@@ -18,7 +18,7 @@ import ApiError from "../utils/ApiError.js";
  *   comes online — counts do not carry across the switch).
  * - passOnStoreError: a Redis outage mid-flight fails OPEN (requests pass)
  *   instead of erroring every request — DB-level account lockout still protects accounts.
- * - In testing environment, rate limiting is disabled to prevent test failures.
+ * - In testing and development environments, rate limiting is disabled to prevent test failures.
  *
  * @param {Object} config
  * @param {string} config.storePrefix - Redis key prefix (e.g. "rl:register:")
@@ -44,6 +44,14 @@ const createRateLimiterWithFallback = ({
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
     passOnStoreError: true, // Fail open if the store errors mid-flight
+
+    // Custom key generator to use user id if authenticated, otherwise fallback to IP address
+    keyGenerator: (req) => {
+      if (req.user && req.user.id) {
+        return `user:${req.user.id}`;
+      }
+      return ipKeyGenerator(req);
+    },
 
     handler: (req, res, next) => {
       next(ApiError.tooManyRequests(message));
@@ -75,7 +83,7 @@ const createRateLimiterWithFallback = ({
   let activeStore = null; // "redis" | "memory" — tracked to log transitions once
 
   return (req, res, next) => {
-    // Bypass rate limiting in testing environment
+    // Bypass rate limiting in testing and development environments
     if (
       (finalConfig.env === "testing" || finalConfig.env === "test" ||
       finalConfig.env === "development")

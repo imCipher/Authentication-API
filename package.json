@@ -44,5 +44,8 @@
   },
   "devDependencies": {
     "prisma": "^7.9.1"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2"
   }
 }

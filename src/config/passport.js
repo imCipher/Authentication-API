@@ -5,6 +5,12 @@ const logger = require("../utils/logger");
 const AuthService = require("../modules/auth/auth.service.js");
 const finalConfig = require("./keys");
 
+// Helper to extract metadata from req
+const getRequestMetadata = req => ({
+  userIp: req.ip || req.connection?.remoteAddress || null,
+  userAgent: req.headers?.["user-agent"] || null,
+});
+
 // Configure Google OAuth Strategy
 if (finalConfig.googleOauth.clientId && finalConfig.googleOauth.clientSecret) {
   passport.use(
@@ -14,9 +20,11 @@ if (finalConfig.googleOauth.clientId && finalConfig.googleOauth.clientSecret) {
         clientSecret: finalConfig.googleOauth.clientSecret,
         callbackURL: finalConfig.googleOauth.callbackUrl,
         scope: ["profile", "email"],
+        passReqToCallback: true, // Pass the request to the callback for metadata extraction
       },
-      async (accessToken, refreshToken, profile, done) => {
+      async (req, accessToken, refreshToken, profile, done) => {
         try {
+          const metadata = getRequestMetadata(req);
           const email = profile.emails?.[0]?.value;
           const isEmailVerified = Boolean(
             profile.emails?.[0]?.verified || profile._json?.email_verified,
@@ -41,9 +49,14 @@ if (finalConfig.googleOauth.clientId && finalConfig.googleOauth.clientSecret) {
                 exixtingUser.id,
                 "GOOGLE",
                 profile.id,
+                metadata,
               );
             } else {
-              user = await AuthService.oauthCreateUser("GOOGLE", profile);
+              user = await AuthService.oauthCreateUser(
+                "GOOGLE",
+                profile,
+                metadata,
+              );
             }
           }
 

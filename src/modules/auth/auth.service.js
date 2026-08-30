@@ -1338,10 +1338,9 @@ class AuthService {
   }
 
   async oauthFindUserByEmail(email) {
-    return await prisma.user.findFirst({
-      where: {
-        email,
-      },
+    if (!email) return null;
+    return await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
     });
   }
 
@@ -1397,14 +1396,22 @@ class AuthService {
 
   async oauthCreateUser(provider, profile, metadata = {}) {
     const normalizedProvider = provider.toUpperCase();
+    const email = profile.emails?.[0]?.value?.toLowerCase();
+    const baseUsername = (
+      profile.name?.givenName ||
+      email?.split("@")[0] ||
+      "user"
+    )
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+    const uniqueUsername = `${baseUsername}_${Math.floor(1000 + Math.random() * 9000)}`;
 
     return await prisma.$transaction(async tx => {
       const newUser = await tx.user.create({
         data: {
-          fullName: profile.displayName || "",
-          username:
-            profile.name.givenName?.toLowerCase() || `user_${Date.now()}`,
-          email: profile.emails?.[0]?.value || null,
+          fullName: profile.displayName || baseUsername,
+          username: uniqueUsername,
+          email,
           emailVerified: true,
           oauthAccounts: {
             create: {

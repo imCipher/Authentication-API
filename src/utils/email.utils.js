@@ -75,6 +75,7 @@ class Email {
     await this.send("register", "Confirm your email address");
   }
 
+  // Sends welcome email after email has been verified
   async sendWelcomeEmail() {
     await this.send("welcome", "Welcome to Test Auth!");
   }

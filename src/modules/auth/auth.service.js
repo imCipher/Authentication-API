@@ -618,7 +618,7 @@ class AuthService {
   }
 
   /**
-   * Verifies an email verification token and marks the user's email as verified.
+   * Verifies an email verification token, send welcome email, and marks the user's email as verified.
    *
    * @param {string} token - The email verification token to verify.
    * @param {Object} metadata - Metadata about the request.
@@ -672,6 +672,20 @@ class AuthService {
           userAgent: metadata?.userAgent || null,
         },
       });
+    });
+
+    const user = prisma.user.find({
+      where: { id: verificationRecord.userId },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+      },
+    });
+
+    // Send the welcome email asynchronously, logging any errors without blocking the process
+    new Email(user).sendWelcomeEmail().catch(error => {
+      logger.warn("Welcome email sending failed", { email: user.email, error });
     });
 
     return true;

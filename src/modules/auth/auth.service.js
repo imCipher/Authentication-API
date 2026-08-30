@@ -1320,7 +1320,117 @@ class AuthService {
   async oauthLogin(userInfo, metadata = {}) {
     user.lastLoginAt = new Date();
 
-    const accessToken = await tokenUtils.signAccessToken({})
+    const accessToken = await tokenUtils.signAccessToken({});
+  }
+
+  async oauthFindUser(provider, providerUserId) {
+    const account = await prisma.oauthAccount.findUnique({
+      where: {
+        provider: provider.toUpperCase(),
+        providerUserId: String(providerUserId),
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    return account?.user || null;
+  }
+
+  async oauthFindUserByEmail(email) {
+    return await prisma.user.findFirst({
+      where: {
+        email,
+      },
+    });
+  }
+
+  async oauthLinkAccount(userId, provider, providerUserId, metadata = {}) {
+    const normalizedProvider = provider.toUpperCase();
+
+    // 1. Check if the OAuth account is already linked elsewhere
+    const existingAccount = await prisma.oauthAccount.findUnique({
+      where: {
+        provider: normalizedProvider,
+        providerUserId: String(providerUserId),
+      },
+    });
+
+    if (existingAccount) {
+      throw ApiError.conflict(
+        "This OAuth account is already linked to an account.",
+      );
+    }
+
+    // 2. Link account, mark email verified, and record audit log
+    return await prisma.$transaction(async tx => {
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          emailVerified: true,
+          oauthAccounts: {
+            create: {
+              provider: normalizedProvider,
+              providerUserId: String(providerUserId),
+            },
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: "OAUTH_ACCOUNT_LINKED",
+          resource: "auth",
+          details: {
+            provider: normalizedProvider,
+            providerUserId: String(providerUserId),
+          },
+          ipAddress: metadata?.userIp || null,
+          userAgent: metadata?.userAgent || null,
+        },
+      });
+
+      return updatedUser;
+    });
+  }
+
+  async oauthCreateUser(provider, profile, metadata = {}) {
+    const normalizedProvider = provider.toUpperCase();
+
+    return await prisma.$transaction(async tx => {
+      const newUser = await tx.user.create({
+        data: {
+          fullName: profile.displayName || "",
+          username:
+            profile.name.givenName?.toLowerCase() || `user_${Date.now()}`,
+          email: profile.emails?.[0]?.value || null,
+          emailVerified: true,
+          oauthAccounts: {
+            create: {
+              provider: normalizedProvider,
+              providerUserId: String(profile.id),
+            },
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: newUser.id,
+          action: "OAUTH_ACCOUNT_LINKED",
+          resource: "auth",
+          details: {
+            provider: normalizedProvider,
+            providerUserId: String(profile.id),
+          },
+          ipAddress: metadata?.userIp || null,
+          userAgent: metadata?.userAgent || null,
+        },
+      });
+
+      return newUser;
+    });
   }
 }
 

@@ -450,18 +450,6 @@ router.post(
  *                message:
  *                  type: string
  *                  example: Logout successful.
- *      400:
- *        description: Bad request. Please check your input.
- *        content:
- *          application/json:
- *            schema:
- *              $ref: '#/components/schemas/ApiValidationError'
- *      429:
- *        description: Too many requests. Please try again later.
- *        content:
- *          application/json:
- *            schema:
- *              $ref: '#/components/schemas/ApiError'
  */
 router.post(
   "/logout",
@@ -642,6 +630,25 @@ router.patch(
   protect,
   validateRequest(authSchema.updateProfileSchema),
   authController.updateProfile,
+);
+
+// --------- OAUTH ROUTES ---------
+
+router.get(
+  "/google",
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    session: false,
+  }),
+);
+
+router.get(
+  "/google/callback",
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: "/api/v1/auth/oauth-failure",
+  }),
+  authController.googleCallback,
 );
 
 export default router;

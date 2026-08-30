@@ -215,6 +215,18 @@ const updateProfile = CatchAsync(async (req, res, next) => {
   });
 });
 
+// --------- OAUTH CONTROLLERS ---------
+/**
+ * @route GET /api/v1/auth/google/callback
+ * @desc Handle Google OAuth callback and return access and refresh tokens
+ * @access Public
+ */
+const googleOAuthCallback = CatchAsync(async (req, res, next) => {
+  const metadata = getRequestMetadata(req);
+  const tokenPair = await AuthService.oauthLogin(req.user, metadata);
+
+})
+
 export default {
   register,
   login,

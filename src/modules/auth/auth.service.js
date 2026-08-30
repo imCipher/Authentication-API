@@ -1316,6 +1316,12 @@ class AuthService {
       });
     }
   }
+
+  async oauthLogin(userInfo, metadata = {}) {
+    user.lastLoginAt = new Date();
+
+    const accessToken = await tokenUtils.signAccessToken({})
+  }
 }
 
 export default new AuthService();

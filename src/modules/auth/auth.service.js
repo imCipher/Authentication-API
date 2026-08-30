@@ -635,6 +635,10 @@ class AuthService {
         tokenHash: hashedToken,
         expiresAt: { gte: new Date() },
       },
+      select: {
+        id: true,
+        userId: true,
+      },
     });
 
     // If no valid verification record is found, throw a bad request error indicating that the token is invalid or has expired
@@ -644,22 +648,42 @@ class AuthService {
       });
     }
 
+    const dbNow = new Date(); // Use a single timestamp for all operations in this transaction
+
     // Use a transaction to update the email verification record, mark the user's email as verified, and create an audit log entry
-    await prisma.$transaction(async tx => {
-      await tx.emailVerification.update({
-        where: { id: verificationRecord.id },
+    const user = await prisma.$transaction(async tx => {
+      // Update the email verification record to mark it as used to prevent reuse
+      const claimed = await tx.emailVerification.updateMany({
+        where: { id: verificationRecord.id, usedAt: null },
         data: {
-          usedAt: new Date(),
+          usedAt: dbNow,
         },
       });
 
-      await tx.user.update({
+      if (claimed.count === 0) {
+        throw ApiError.badRequest(
+          "Token is invalid or has expired",
+          undefined,
+          {
+            code: "TOKEN_INVALID",
+          },
+        );
+      }
+
+      // Update the user's emailVerified field to true to indicate that the email has been verified
+      const updatedUser = await tx.user.update({
         where: { id: verificationRecord.userId },
         data: {
           emailVerified: true,
         },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+        },
       });
 
+      // Create an audit log entry to record the email verification action
       await tx.auditLog.create({
         data: {
           userId: verificationRecord.userId,
@@ -672,15 +696,8 @@ class AuthService {
           userAgent: metadata?.userAgent || null,
         },
       });
-    });
 
-    const user = prisma.user.find({
-      where: { id: verificationRecord.userId },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-      },
+      return updatedUser;
     });
 
     // Send the welcome email asynchronously, logging any errors without blocking the process

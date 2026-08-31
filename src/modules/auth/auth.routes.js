@@ -651,4 +651,7 @@ router.get(
   authController.googleCallback,
 );
 
+// For the frontend to be able to exchange the OAuth code for access and refresh tokens, you can create a separate endpoint that the frontend can call after receiving the OAuth code. This endpoint will handle the token exchange and return the tokens to the frontend.
+// router.post("/oauth/exchange", authController.exchangeToken);
+
 export default router;

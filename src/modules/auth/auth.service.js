@@ -1439,6 +1439,64 @@ class AuthService {
       return newUser;
     });
   }
+
+  async createOAuthExchangeCode(userId) {
+    const rawCode = crypto.randomBytes(32).toString("hex");
+    const hashedCode = tokenUtils.hashToken(rawCode);
+    const expiresAt = new Date(Date.now() + 60 * 1000); // 5 minutes from now
+
+    await prisma.oauthExchangeCode.create({
+      data: {
+        userId,
+        codeHash: hashedCode,
+        expiresAt,
+      },
+    });
+
+    return rawCode;
+  }
+
+  async oauthLogin(user, metadata = {}) {
+    const accessToken = await tokenUtils.signAccessToken({
+      userId: user.id,
+      role: user.role,
+    });
+    const { refreshToken } = await tokenUtils.signRefreshToken(
+      user.id,
+      metadata,
+    );
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: {
+          lastLoginAt: new Date(),
+          lastLoginIp: metadata?.userIp || null,
+          failedAttempts: 0,
+        },
+      }),
+      prisma.loginHistory.create({
+        data: {
+          userId: user.id,
+          ipAddress: metadata?.userIp || "unknown",
+          userAgent: metadata?.userAgent || null,
+          success: true,
+        },
+      }),
+    ]);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+      },
+    };
+  }
 }
 
 export default new AuthService();

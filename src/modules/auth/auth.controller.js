@@ -221,11 +221,18 @@ const updateProfile = CatchAsync(async (req, res, next) => {
  * @desc Handle Google OAuth callback and return access and refresh tokens
  * @access Public
  */
-const googleOAuthCallback = CatchAsync(async (req, res, next) => {
+const googleCallback = CatchAsync(async (req, res, next) => {
   const metadata = getRequestMetadata(req);
-  const tokenPair = await AuthService.oauthLogin(req.user, metadata);
+  const result = await AuthService.oauthLogin(req.user, metadata);
 
-})
+  ApiResponse.success(res, "Google OAuth login successful.", {
+    tokens: {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    },
+    user: result.user,
+  });
+});
 
 export default {
   register,
@@ -240,4 +247,5 @@ export default {
   getCurrentUser,
   changePassword,
   updateProfile,
+  googleCallback,
 };

@@ -40,14 +40,14 @@ if (finalConfig.googleOAuth.clientId && finalConfig.googleOAuth.clientSecret) {
 
           let user = await AuthService.oauthFindUser("GOOGLE", profile.id);
           if (!user) {
-            const exixtingUser = await AuthService.oauthFindUserbyEmail(email);
-            if (exixtingUser) {
+            const existingUser = await AuthService.oauthFindUserByEmail(email);
+            if (existingUser) {
               // Only link automatically if the email is verified by Google
               if (!isEmailVerified) {
                 return done(new Error("Google email is not verified."), null);
               }
               user = await AuthService.oauthLinkAccount(
-                exixtingUser.id,
+                existingUser.id,
                 "GOOGLE",
                 profile.id,
                 metadata,

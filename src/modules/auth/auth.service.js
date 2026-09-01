@@ -1317,12 +1317,6 @@ class AuthService {
     }
   }
 
-  async oauthLogin(userInfo, metadata = {}) {
-    user.lastLoginAt = new Date();
-
-    const accessToken = await tokenUtils.signAccessToken({});
-  }
-
   async oauthFindUser(provider, providerUserId) {
     const account = await prisma.oauthAccount.findUnique({
       where: {

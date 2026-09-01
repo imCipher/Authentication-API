@@ -1326,8 +1326,11 @@ class AuthService {
   async oauthFindUser(provider, providerUserId) {
     const account = await prisma.oauthAccount.findUnique({
       where: {
-        provider: provider.toUpperCase(),
-        providerUserId: String(providerUserId),
+        provider_providerUserId: {
+          // 👈 Wrap under compound unique
+          provider: provider.toUpperCase(),
+          providerUserId: String(providerUserId),
+        },
       },
       include: {
         user: true,
@@ -1350,8 +1353,13 @@ class AuthService {
     // 1. Check if the OAuth account is already linked elsewhere
     const existingAccount = await prisma.oauthAccount.findUnique({
       where: {
-        provider: normalizedProvider,
-        providerUserId: String(providerUserId),
+        /*👈 Wrap under compound unique key because:
+         * In Prisma, because OauthAccount has a compound unique index @@unique([provider, providerUserId]) in prisma/schema.prisma:144, findUnique requires the fields to be nested under provider_providerUserId.
+         */
+        provider_providerUserId: {
+          provider: normalizedProvider,
+          providerUserId: String(providerUserId),
+        },
       },
     });
 

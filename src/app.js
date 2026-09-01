@@ -13,6 +13,8 @@ import { generalRateLimiter } from "./middlewares/rateLimiter.middleware.js";
 import healthRoutes from "./modules/health/health.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 
+import "./config/passport.js"; // Import Passport configuration
+
 // Initialize Express App
 const app = express();
 

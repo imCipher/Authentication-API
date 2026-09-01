@@ -1,9 +1,10 @@
-const passport = require("passport");
-const { Strategy: GoogleStrategy } = require("passport-google-oauth20");
-const { Strategy: GithubStrategy } = require("passport-github2");
-const logger = require("../utils/logger");
-const AuthService = require("../modules/auth/auth.service.js");
-const finalConfig = require("./keys");
+import passport from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { Strategy as GithubStrategy } from "passport-github2";
+
+import logger from "../config/logger.js";
+import AuthService from "../modules/auth/auth.service.js";
+import finalConfig from "./keys.js";
 
 // Helper to extract metadata from req
 const getRequestMetadata = req => ({
@@ -12,13 +13,13 @@ const getRequestMetadata = req => ({
 });
 
 // Configure Google OAuth Strategy
-if (finalConfig.googleOauth.clientId && finalConfig.googleOauth.clientSecret) {
+if (finalConfig.googleOAuth.clientId && finalConfig.googleOAuth.clientSecret) {
   passport.use(
     new GoogleStrategy(
       {
-        clientID: finalConfig.googleOauth.clientId,
-        clientSecret: finalConfig.googleOauth.clientSecret,
-        callbackURL: finalConfig.googleOauth.callbackUrl,
+        clientID: finalConfig.googleOAuth.clientId,
+        clientSecret: finalConfig.googleOAuth.clientSecret,
+        callbackURL: finalConfig.googleOAuth.callbackUrl,
         scope: ["profile", "email"],
         passReqToCallback: true, // Pass the request to the callback for metadata extraction
       },

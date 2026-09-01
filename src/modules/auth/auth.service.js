@@ -1465,14 +1465,11 @@ class AuthService {
   }
 
   async oauthLogin(user, metadata = {}) {
-    const accessToken = await tokenUtils.signAccessToken({
+    const accessToken = await this.generateAccessToken({
       userId: user.id,
       role: user.role,
     });
-    const { refreshToken } = await tokenUtils.signRefreshToken(
-      user.id,
-      metadata,
-    );
+    const { refreshToken } = await this.generateRefreshToken(user.id, metadata);
 
     await prisma.$transaction([
       prisma.user.update({

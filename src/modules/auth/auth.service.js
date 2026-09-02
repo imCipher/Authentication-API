@@ -1317,15 +1317,24 @@ class AuthService {
     }
   }
 
+  /**
+   * Find a user in the database by their OAuth provider and provider user ID.
+   * @param {string} provider - The OAuth provider (e.g., "GOOGLE", "GITHUB").
+   * @param {string} providerUserId - The user ID in the OAuth provider's system.
+   * @returns {Promise<Object|null>} - The user object if found, otherwise null.
+   */
   async oauthFindUser(provider, providerUserId) {
     const account = await prisma.oauthAccount.findUnique({
       where: {
         provider_providerUserId: {
-          // 👈 Wrap under compound unique
+          /*👈 Wrap under compound unique key because:
+           * In Prisma, because OauthAccount has a compound unique index @@unique([provider, providerUserId]) in prisma/schema.prisma:144, findUnique requires the fields to be nested under provider_providerUserId.
+           */
           provider: provider.toUpperCase(),
           providerUserId: String(providerUserId),
         },
       },
+      // To retrieve the associated user, we include the user relation in the query
       include: {
         user: true,
       },
@@ -1334,6 +1343,11 @@ class AuthService {
     return account?.user || null;
   }
 
+  /**
+   * Find a user in the database by their email.
+   * @param {string} email - The user's email.
+   * @returns {Promise<Object|null>} - The user object if found, otherwise null.
+   */
   async oauthFindUserByEmail(email) {
     if (!email) return null;
     return await prisma.user.findUnique({
@@ -1341,6 +1355,14 @@ class AuthService {
     });
   }
 
+  /**
+   * Link an OAuth account to a user that already exists in the database.
+   * @param {string} userId - The ID of the user to link the account to.
+   * @param {string} provider - The OAuth provider (e.g., "GOOGLE", "GITHUB").
+   * @param {string} providerUserId - The user ID in the OAuth provider's system.
+   * @param {Object} metadata - Additional metadata for the audit log.
+   * @returns {Promise<Object>} - The updated user object.
+   */
   async oauthLinkAccount(userId, provider, providerUserId, metadata = {}) {
     const normalizedProvider = provider.toUpperCase();
 
@@ -1357,6 +1379,7 @@ class AuthService {
       },
     });
 
+    // If the OAuth account is already linked to another user, throw a conflict error
     if (existingAccount) {
       throw ApiError.conflict(
         "This OAuth account is already linked to an account.",
@@ -1396,9 +1419,19 @@ class AuthService {
     });
   }
 
+  /**
+   * Create a new user with an OAuth account.
+   * @param {string} provider - The OAuth provider (e.g., "GOOGLE", "GITHUB").
+   * @param {Object} profile - The user's profile from the OAuth provider.
+   * @param {Object} metadata - Additional metadata for the audit log.
+   * @returns {Promise<Object>} - The created user object.
+   */
   async oauthCreateUser(provider, profile, metadata = {}) {
+    // Normalize the provider name to uppercase for consistency
     const normalizedProvider = provider.toUpperCase();
+    // Extract the email from the profile, if available, and convert it to lowercase
     const email = profile.emails?.[0]?.value?.toLowerCase();
+    // Generate a base username from the profile's given name or email, defaulting to "user" if neither is available
     const baseUsername = (
       profile.name?.givenName ||
       email?.split("@")[0] ||
@@ -1406,8 +1439,11 @@ class AuthService {
     )
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "");
+
+    // Generate a unique username by appending a random 4-digit number to the base username to avoid collisions
     const uniqueUsername = `${baseUsername}_${Math.floor(1000 + Math.random() * 9000)}`;
 
+    // Use a transaction to create the new user, link the OAuth account, and create an audit log entry
     return await prisma.$transaction(async tx => {
       const newUser = await tx.user.create({
         data: {
@@ -1442,6 +1478,11 @@ class AuthService {
     });
   }
 
+  /**
+   * Create an OAuth exchange code for a user(Note implemented yet because of no frontend).
+   * @param {string} userId - The ID of the user.
+   * @returns {Promise<string>} - The generated exchange code.
+   */
   async createOAuthExchangeCode(userId) {
     const rawCode = crypto.randomBytes(32).toString("hex");
     const hashedCode = tokenUtils.hashToken(rawCode);
@@ -1458,13 +1499,22 @@ class AuthService {
     return rawCode;
   }
 
+  /**
+   * Logs in a user by generating access and refresh tokens, updating the user's last login information, and recording the login history.
+   * This method is typically called after successful authentication OAuth login.
+   * @param {Object} user - The user object representing the authenticated user.
+   * @param {Object} metadata - Metadata about the request, including user IP and user agent.
+   * @returns {Object} - An object containing the access token, refresh token, and user information.
+   */
   async oauthLogin(user, metadata = {}) {
+    // Generate access and refresh tokens for the user
     const accessToken = await this.generateAccessToken({
       userId: user.id,
       role: user.role,
     });
     const { refreshToken } = await this.generateRefreshToken(user.id, metadata);
 
+    // Use a transaction to update the user's last login information and create a login history record
     await prisma.$transaction([
       prisma.user.update({
         where: { id: user.id },
@@ -1480,6 +1530,7 @@ class AuthService {
           ipAddress: metadata?.userIp || "unknown",
           userAgent: metadata?.userAgent || null,
           success: true,
+          reason: "OAuth login successful.",
         },
       }),
     ]);

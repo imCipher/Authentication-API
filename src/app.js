@@ -12,6 +12,7 @@ import { notFound, errorHandler } from "./middlewares/error.middleware.js";
 import { generalRateLimiter } from "./middlewares/rateLimiter.middleware.js";
 import healthRoutes from "./modules/health/health.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
+import adminRoutes from "./modules/admin/admin.routes.js";
 
 import "./config/passport.js"; // Import Passport configuration
 
@@ -45,6 +46,7 @@ const apiPrefix = `/api/${finalConfig.apiVersion}`;
 // Routes
 app.use(`${apiPrefix}/health`, healthRoutes);
 app.use(`${apiPrefix}/auth`, authRoutes);
+app.use(`${apiPrefix}/admin`, adminRoutes);
 if (finalConfig.nodeEnv !== "production") {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 }

@@ -727,4 +727,22 @@ router.get(
 // For the frontend to be able to exchange the OAuth code for access and refresh tokens, you can create a separate endpoint that the frontend can call after receiving the OAuth code. This endpoint will handle the token exchange and return the tokens to the frontend.
 // router.post("/oauth/exchange", authController.exchangeToken);
 
+/**
+ * @swagger
+ * /auth/oauth-failure:
+ *   get:
+ *     summary: OAuth authentication failure endpoint.
+ *     description: Redirect destination when an OAuth authentication flow fails or is cancelled by the user.
+ *     tags: [Authentication]
+ *     security: []
+ *     responses:
+ *       401:
+ *         description: OAuth authentication failed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ */
+router.get("/oauth-failure", authController.oauthFailure);
+
 export default router;

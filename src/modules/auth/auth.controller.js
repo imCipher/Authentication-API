@@ -1,6 +1,7 @@
 import CatchAsync from "../../utils/catchasync.js";
 import AuthService from "./auth.service.js";
 import ApiResponse from "../../utils/ApiResponse.js";
+import ApiError from "../../utils/ApiError.js";
 
 /**
  * Get request metadata (IP address and user agent) from the request object.
@@ -234,6 +235,17 @@ const googleCallback = CatchAsync(async (req, res, next) => {
   });
 });
 
+/**
+ * @route GET /api/v1/auth/oauth/failure
+ * @desc Handle OAuth failure and return an error response
+ * @access Public
+ */
+const oauthFailure = CatchAsync(async (req, res, next) => {
+  throw ApiError.unauthorized(
+    "OAuth authentication failed or was canceled by the user.",
+  );
+});
+
 export default {
   register,
   login,
@@ -248,4 +260,5 @@ export default {
   changePassword,
   updateProfile,
   googleCallback,
+  oauthFailure,
 };

@@ -633,7 +633,33 @@ router.patch(
 );
 
 // --------- OAUTH ROUTES ---------
-
+/**
+ * @swagger
+ * /auth/google:
+ *   get:
+ *    summary: Initiate Google OAuth2 authentication flow
+ *    description: |
+ *      Redirects the client to Google's OAuth 2.0 consent page.
+ *
+ *      **Note:** This endpoint performs a 302 browser redirect. It should be triggered by navigating directly in the browser (e.g. `<a href="/api/v1/auth/google">` or `window.location.href`), **not** via an AJAX/fetch call from Swagger UI, as Google blocks cross-origin requests (CORS).
+ *    tags: [Authentication]
+ *    security: []
+ *    responses:
+ *      302:
+ *        description: Redirect to Google OAuth 2.0 login/consent screen.
+ *        headers:
+ *          Location:
+ *            description: The Google OAuth 2.0 authorization URL.
+ *            schema:
+ *              type: string
+ *              example: "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=..."
+ *      500:
+ *        description: Internal server error or OAuth service failure.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ */
 router.get(
   "/google",
   passport.authenticate("google", {
@@ -642,6 +668,53 @@ router.get(
   }),
 );
 
+/**
+ * @swagger
+ * /auth/google/callback:
+ *   get:
+ *     summary: Google OAuth2 callback URL.
+ *     description: Google redirects back to this endpoint with an authorization code. The server exchanges it for user information, authenticates/creates the user, and returns access and refresh tokens.
+ *     tags: [Authentication]
+ *     security: []
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: The authorization code provided by Google.
+ *       - in: query
+ *         name: state
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: OAuth state parameter (if enabled).
+ *     responses:
+ *       200:
+ *         description: Google OAuth login successful.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiSuccess'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         tokens:
+ *                           $ref: '#/components/schemas/TokenPair'
+ *                         user:
+ *                           $ref: '#/components/schemas/User'
+ *       302:
+ *         description: Redirect to failure URL if Google authentication failed.
+ *       401:
+ *         description: Authentication failed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ */
 router.get(
   "/google/callback",
   passport.authenticate("google", {

@@ -1507,6 +1507,16 @@ class AuthService {
    * @returns {Object} - An object containing the access token, refresh token, and user information.
    */
   async oauthLogin(user, metadata = {}) {
+    // Always block suspended / deactivated users from logging in, even if they have a valid OAuth account
+    if (user.status !== "ACTIVE") {
+      throw ApiError.forbidden(
+        "Your account is suspended or deactivated. Please contact support for assistance.",
+        {
+          code: "ACCOUNT_SUSPENDED",
+        },
+      );
+    }
+
     // Generate access and refresh tokens for the user
     const accessToken = await this.generateAccessToken({
       userId: user.id,
@@ -1522,6 +1532,7 @@ class AuthService {
           lastLoginAt: new Date(),
           lastLoginIp: metadata?.userIp || null,
           failedAttempts: 0,
+          lockedUntil: null, // Safely clear the lockout if it was previously set, as the user has successfully logged in
         },
       }),
       prisma.loginHistory.create({

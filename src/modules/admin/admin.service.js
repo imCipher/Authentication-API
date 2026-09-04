@@ -21,6 +21,38 @@ const USER_LIST_SELECT = {
 };
 
 /**
+ * Detailed user projection for admin inspection.
+ * Excludes sensitive secrets like password hashes while exposing operational state.
+ */
+const USER_DETAIL_SELECT = {
+  id: true,
+  fullName: true,
+  email: true,
+  username: true,
+  role: true,
+  status: true,
+  emailVerified: true,
+  failedAttempts: true,
+  lockedUntil: true,
+  lastLoginAt: true,
+  lastLoginIp: true,
+  sessionsRevokedAt: true,
+  passwordChangedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  oauthAccounts: {
+    select: {
+      provider: true,
+      createdAt: true,
+    },
+  },
+};
+
+// UUID regex pattern for validating UUID strings (v1-v5)
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
  * Standardized set of allowed roles for filtering users in admin views.
  * This ensures that only valid roles are used in queries, preventing injection or invalid data issues.
  */
@@ -127,6 +159,26 @@ class AdminService {
         hasPrevPage: safePage > 1 && totalCount > 0,
       },
     };
+  }
+
+  /**
+   * Fetches a specific user by their unique ID.
+   * @param {string} id - The unique identifier of the user (UUID)
+   * @returns {Promise<Object|null>} - Returns the user object if found, otherwise null
+   */
+  async getUserById(id) {
+    if (!id || typeof id !== "string" || !UUID_REGEX.test(id.trim())) {
+      throw ApiError.badRequest(
+        "User ID is required and must be a valid UUID.",
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: id.trim().toLowerCase() },
+      select: USER_DETAIL_SELECT,
+    });
+
+    return user;
   }
 }
 

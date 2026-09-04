@@ -155,4 +155,62 @@ router.get(
   adminController.getUsers,
 );
 
+/**
+ * @swagger
+ * /admin/users/{id}:
+ *   get:
+ *    summary: Fetch a specific user by ID (Admin-only)
+ *    description: Retrieve a specific user by their unique ID. This endpoint is restricted to admin users only.
+ *    parameters:
+ *      - in: path
+ *        name: id
+ *        schema:
+ *          type: string
+ *        required: true
+ *        description: The unique identifier of the user (UUID)
+ *    tags: [Admin]
+ *    responses:
+ *      200:
+ *        description: User retrieved successfully.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              allOf:
+ *                  - $ref: '#/components/schemas/ApiSuccess'
+ *                  - type: object
+ *                    properties:
+ *                       user:
+ *                         $ref: '#/components/schemas/User'
+ *      400:
+ *        description: Validation failed. Invalid query parameters provided.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiValidationError'
+ *      401:
+ *        description: Unauthorized. Please provide valid authentication credentials.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ *      403:
+ *        description: Forbidden. You do not have permission to access this resource.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ *      429:
+ *        description: Too many requests. Rate limit exceeded.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiError'
+ */
+router.get(
+  "/users/:id",
+  adminReadRateLimiter,
+  validateRequest(adminSchema.userIdParamsSchema),
+  adminController.getUserById,
+);
+
 export default router;

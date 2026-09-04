@@ -66,6 +66,23 @@ const getUsersSchema = {
   }),
 };
 
+/**
+ * Validation schema for retrieving a single user by ID.
+ * Enforces that the ID is a valid UUID string.
+ */
+const userIdParamsSchema = {
+  params: z
+    .object({
+      id: z
+        .string("User ID is required")
+        .trim()
+        .toLowerCase()
+        .pipe(z.uuid("Invalid user ID format. Must be a valid UUID.")),
+    })
+    .strict(),
+};
+
 export default {
   getUsersSchema,
+  userIdParamsSchema,
 };

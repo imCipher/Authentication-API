@@ -47,7 +47,7 @@ export const seedAdmin = async () => {
         fullName,
         username: username.toLowerCase(),
         email: email.toLowerCase(),
-        password: hashedPassword,
+        passwordHash: hashedPassword,
         role: "ADMIN",
         status: "ACTIVE",
         emailVerified: true,

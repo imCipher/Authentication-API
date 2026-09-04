@@ -236,15 +236,3 @@ export const adminHeavyMaintenanceRateLimiter = createRateLimiterWithFallback({
   message:
     "Too many admin heavy maintenance requests from this IP, please try again later.",
 });
-
-export default {
-  registerRateLimiter,
-  authRateLimiter,
-  emailVerificationRateLimiter,
-  passwordResetRateLimiter,
-  generalRateLimiter,
-  oauthExchangeRateLimiter,
-  adminReadRateLimiter,
-  adminSensitiveMutationRateLimiter,
-  adminHeavyMaintenanceRateLimiter,
-};

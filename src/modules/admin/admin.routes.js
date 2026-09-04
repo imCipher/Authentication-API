@@ -39,7 +39,7 @@ router.use(authorize("admin")); // Apply role-based access control middleware to
  *          type: integer
  *          default: 1
  *          minimum: 1
- *        description: Page number for pagination
+ *        description: "Page number for pagination"
  *      - in: query
  *        name: limit
  *        schema:
@@ -47,37 +47,38 @@ router.use(authorize("admin")); // Apply role-based access control middleware to
  *           default: 10
  *           minimum: 1
  *           maximum: 100
- *        description: Number of records to return per page (maximum 100)
+ *        description: "Number of records to return per page (maximum 100)"
  *      - in: query
  *        name: role
  *        schema:
  *           type: string
  *           enum: [USER, ADMIN]
- *        description: Filter users by account role (USER or ADMIN)
+ *        description: "Filter users by account role (USER or ADMIN)"
  *      - in: query
  *        name: status
  *        schema:
  *           type: string
  *           enum: [ACTIVE, SUSPENDED, DEACTIVATED]
- *        description: Filter users by account status (ACTIVE, SUSPENDED, DEACTIVATED)
+ *        description: "Filter users by account status (ACTIVE, SUSPENDED, DEACTIVATED)"
  *      - in: query
  *        name: search
  *        schema:
  *           type: string
- *        description: Search term to match against email, username, or full name (max 100 characters)
+ *        description: "Search term to match against email, username, or full name (max 100 characters)"
  *      - in: query
  *        name: sortBy
  *        schema:
  *           type: string
  *           enum: [createdAt, fullName, email, username, lastLoginAt]
- *        description: Field to sort the results by (default: createdAt)
+ *           default: createdAt
+ *        description: "Field to sort the results by (default: createdAt)"
  *      - in: query
  *        name: sortOrder
  *        schema:
  *           type: string
  *           enum: [asc, desc]
  *           default: desc
- *        description: Order to sort the results by (default: desc)
+ *        description: "Order to sort the results by (default: desc)"
  *    responses:
  *      200:
  *        description: Users retrieved successfully with pagination metadata.
@@ -87,7 +88,7 @@ router.use(authorize("admin")); // Apply role-based access control middleware to
  *              allOf:
  *                  - $ref: '#/components/schemas/ApiSuccess'
  *                  - type: object
- *                      properties:
+ *                    properties:
  *                          data:
  *                              type: object
  *                              properties:

@@ -27,33 +27,47 @@ class AdminService {
   /**
    * Fetches a paginated list of users from the database with filtering and search.
    * @param {Object} options - Query options
+   * @param {number} [options.page=1] - 1-based page number
+   * @param {number} [options.limit=10] - Number of records per page (capped at 100)
    * @param {string} [options.role] - Filter by UserRole (USER, ADMIN)
    * @param {string} [options.status] - Filter by UserStatus (ACTIVE, SUSPENDED, DEACTIVATED)
    * @param {string} [options.search] - Search term matching email, username, or full name
-   * @param {number} [options.page=1] - 1-based page number
-   * @param {number} [options.limit=10] - Number of records per page (capped at 100)
    * @param {string} [options.sortBy="createdAt"] - Field to sort by
    * @param {"asc"|"desc"} [options.sortOrder="desc"] - Sort direction
    * @returns {Promise<{ users: Array, pagination: Object }>}
    */
   async getUsers({
+    page = 1,
+    limit = 10,
     role,
     status,
     search,
-    page = 1,
-    limit = 10,
     sortBy = "createdAt",
     sortOrder = "desc",
   } = {}) {
     // Sanitize and defensively bound pagination
-    const skip = (page - 1) * limit;
+    const safePage = Math.max(1, parseInt(page, 10) || 1);
+    const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
+    const skip = (safePage - 1) * safeLimit;
 
     // Build explicit, safe where clause (prevents query injection)
     const where = {};
-    if (role) {
+
+    const ALLOWED_ROLES = new Set(["USER", "ADMIN"]);
+    if (
+      role &&
+      typeof role === "string" &&
+      ALLOWED_ROLES.has(role.toUpperCase())
+    ) {
       where.role = role.toUpperCase();
     }
-    if (status) {
+
+    const ALLOWED_STATUSES = new Set(["ACTIVE", "SUSPENDED", "DEACTIVATED"]);
+    if (
+      status &&
+      typeof status === "string" &&
+      ALLOWED_STATUSES.has(status.toUpperCase())
+    ) {
       where.status = status.toUpperCase();
     }
 
@@ -66,7 +80,7 @@ class AdminService {
       ];
     }
 
-    // Whitelist allowed sort fields to prevent invalid column errors
+    // Whitelist allowed sort fields
     const allowedSortFields = [
       "createdAt",
       "fullName",
@@ -79,28 +93,29 @@ class AdminService {
     const safeSortOrder = sortOrder === "asc" ? "asc" : "desc";
 
     // Fetch records and total count concurrently
+    // Use secondary sort on id for deterministic pagination across identical values
     const [users, totalCount] = await Promise.all([
       prisma.user.findMany({
         where,
         select: USER_LIST_SELECT,
         skip,
-        take: limit,
-        orderBy: { [safeSortBy]: safeSortOrder },
+        take: safeLimit,
+        orderBy: [{ [safeSortBy]: safeSortOrder }, { id: safeSortOrder }],
       }),
       prisma.user.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(totalCount / limit);
+    const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / safeLimit);
 
     return {
       users,
       pagination: {
         totalCount,
         totalPages,
-        currentPage: page,
-        limit,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
+        currentPage: safePage,
+        limit: safeLimit,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1 && totalCount > 0,
       },
     };
   }

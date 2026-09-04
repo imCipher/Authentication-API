@@ -8,14 +8,8 @@ import ApiResponse from "../../utils/ApiResponse.js";
  * @access Private/Admin
  */
 const getUsers = CatchAsync(async (req, res) => {
-  const query = req.validated?.query || {};
-
-  const page = Math.max(1, parseInt(query.page, 10) || 1);
-  const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 10));
-
-  const role = query.role ? query.role.toUpperCase() : undefined;
-  const status = query.status ? query.status.toUpperCase() : undefined;
-  const search = query.search ? query.search.trim() : undefined;
+  const { page, limit, role, status, search, sortBy, sortOrder } =
+    req.validated.query;
 
   const { users, pagination } = await AdminService.getUsers({
     page,
@@ -23,6 +17,8 @@ const getUsers = CatchAsync(async (req, res) => {
     role,
     status,
     search,
+    sortBy,
+    sortOrder,
   });
 
   ApiResponse.success(res, "Users retrieved successfully.", {

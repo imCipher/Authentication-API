@@ -70,6 +70,8 @@ model User {
   @@index([username])
   @@index([id])
   @@index([email])
+  @@index([createdAt])
+  @@index([lastLoginAt])
   @@map("users")
 }
 

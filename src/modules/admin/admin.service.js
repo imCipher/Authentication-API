@@ -21,6 +21,18 @@ const USER_LIST_SELECT = {
 };
 
 /**
+ * Standardized set of allowed roles for filtering users in admin views.
+ * This ensures that only valid roles are used in queries, preventing injection or invalid data issues.
+ */
+const ALLOWED_ROLES = new Set(["USER", "ADMIN"]);
+
+/**
+ * Standardized set of allowed statuses for filtering users in admin views.
+ * This ensures that only valid statuses are used in queries, preventing injection or invalid data issues.
+ */
+const ALLOWED_STATUSES = new Set(["ACTIVE", "SUSPENDED", "DEACTIVATED"]);
+
+/**
  * AdminService class provides administrative functionalities for managing users in the system.
  */
 class AdminService {
@@ -53,7 +65,6 @@ class AdminService {
     // Build explicit, safe where clause (prevents query injection)
     const where = {};
 
-    const ALLOWED_ROLES = new Set(["USER", "ADMIN"]);
     if (
       role &&
       typeof role === "string" &&
@@ -62,7 +73,6 @@ class AdminService {
       where.role = role.toUpperCase();
     }
 
-    const ALLOWED_STATUSES = new Set(["ACTIVE", "SUSPENDED", "DEACTIVATED"]);
     if (
       status &&
       typeof status === "string" &&
@@ -81,15 +91,14 @@ class AdminService {
     }
 
     // Whitelist allowed sort fields
-    const allowedSortFields = [
+    const allowedSortFields = new Set([
       "createdAt",
       "fullName",
       "email",
       "username",
       "lastLoginAt",
-    ];
-    const safeSortBy =
-      allowedSortFields.includes(sortBy) ? sortBy : "createdAt";
+    ]);
+    const safeSortBy = allowedSortFields.has(sortBy) ? sortBy : "createdAt";
     const safeSortOrder = sortOrder === "asc" ? "asc" : "desc";
 
     // Fetch records and total count concurrently

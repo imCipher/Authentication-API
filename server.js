@@ -42,6 +42,11 @@ const startServer = async () => {
 
     logger.info("✅ Database connected successfully");
 
+    // Seed the default admin user if it doesn't exist
+    await import("./src/config/seedAdmin.js").then(module =>
+      module.seedAdmin(),
+    );
+
     // Connection to redis
     await redisService.connect();
 

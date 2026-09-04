@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import validateRequest from "../../middlewares/validator.middleware.js";
-import { getUsersSchema } from "./admin.validation.js";
+import adminSchema from "./admin.validation.js";
 import adminController from "./admin.controller.js";
 import {
   adminReadRateLimiter,
@@ -150,7 +150,7 @@ router.use(authorize("admin")); // Apply role-based access control middleware to
 router.get(
   "/users",
   adminReadRateLimiter,
-  validateRequest(getUsersSchema),
+  validateRequest(adminSchema.getUsersSchema),
   adminController.getUsers,
 );
 

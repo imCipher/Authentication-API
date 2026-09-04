@@ -1,11 +1,11 @@
 import "dotenv/config";
 
-/** 
+/**
  * Storing configuration values in a single object makes it easier
  * to manage and access them throughout the application.
  * This object can be imported wherever needed,
  * ensuring consistency and reducing the risk of typos
- * or mismatched values. 
+ * or mismatched values.
  */
 const config = {
   // Server
@@ -79,6 +79,14 @@ const config = {
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
     maxRequest: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
+  },
+
+  //Default System Admin (used for initial seeding)
+  adminSeed: {
+    fullName: process.env.ADMIN_FULL_NAME || "Super Administrator",
+    email: process.env.ADMIN_EMAIL || "admin@example.com",
+    username: process.env.ADMIN_USERNAME || "admin",
+    password: process.env.ADMIN_PASSWORD || "Admin@12345",
   },
 };
 

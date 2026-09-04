@@ -10,6 +10,43 @@ const emptyToUndefined = value => {
 };
 
 /**
+ * Validate query parameter for identifying a user by ID. Ensures the ID is a valid UUID string.
+ */
+const userIdParam = z
+  .string("User ID is required")
+  .trim()
+  .toLowerCase()
+  .pipe(z.uuid("Invalid user ID format. Must be a valid UUID."));
+
+/**
+ * Reusable user role schema with case normalization and custom error messages.
+ */
+const userRoleSchema = z.preprocess(
+  val => {
+    const cleaned = emptyToUndefined(val);
+    return typeof cleaned === "string" ? cleaned.toUpperCase() : cleaned;
+  },
+  z.enum(["USER", "ADMIN"], {
+    errorMap: () => ({ message: "Role must be either 'USER' or 'ADMIN'" }),
+  }),
+);
+
+/**
+ * Reusable user status schema with case normalization and custom error messages.
+ */
+const userStatusSchema = z.preprocess(
+  val => {
+    const cleaned = emptyToUndefined(val);
+    return typeof cleaned === "string" ? cleaned.toUpperCase() : cleaned;
+  },
+  z.enum(["ACTIVE", "SUSPENDED", "DEACTIVATED"], {
+    errorMap: () => ({
+      message: "Status must be 'ACTIVE', 'SUSPENDED', or 'DEACTIVATED'",
+    }),
+  }),
+);
+
+/**
  * Validation schema for admin user listing query parameters.
  * Enforces pagination, filtering, searching, and sorting rules.
  */
@@ -28,20 +65,8 @@ const getUsersSchema = {
         .max(100, "Limit cannot exceed 100")
         .default(10),
     ),
-    role: z.preprocess(
-      val => {
-        const cleaned = emptyToUndefined(val);
-        return typeof cleaned === "string" ? cleaned.toUpperCase() : cleaned;
-      },
-      z.enum(["USER", "ADMIN"]).optional(),
-    ),
-    status: z.preprocess(
-      val => {
-        const cleaned = emptyToUndefined(val);
-        return typeof cleaned === "string" ? cleaned.toUpperCase() : cleaned;
-      },
-      z.enum(["ACTIVE", "SUSPENDED", "DEACTIVATED"]).optional(),
-    ),
+    role: userRoleSchema.optional(),
+    status: userStatusSchema.optional(),
     search: z.preprocess(
       emptyToUndefined,
       z
@@ -73,16 +98,35 @@ const getUsersSchema = {
 const userIdParamsSchema = {
   params: z
     .object({
-      id: z
-        .string("User ID is required")
-        .trim()
-        .toLowerCase()
-        .pipe(z.uuid("Invalid user ID format. Must be a valid UUID.")),
+      id: userIdParam,
     })
     .strict(),
+};
+
+/**
+ * Validation schema for updating a user's role and/or status.
+ * Enforces that at least one of 'role' or 'status' is provided, and validates their values.
+ */
+const patchUserSchema = {
+  params: z
+    .object({
+      id: userIdParam,
+    })
+    .strict(),
+  body: z
+    .object({
+      role: userRoleSchema.optional(),
+      status: userStatusSchema.optional(),
+    })
+    .strict()
+    .refine(data => data.role !== undefined || data.status !== undefined, {
+      message:
+        "At least one of 'role' or 'status' must be provided for update.",
+    }),
 };
 
 export default {
   getUsersSchema,
   userIdParamsSchema,
+  patchUserSchema,
 };

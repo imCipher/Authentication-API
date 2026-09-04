@@ -166,6 +166,7 @@ router.get(
  *        name: id
  *        schema:
  *          type: string
+ *          format: uuid
  *        required: true
  *        description: The unique identifier of the user (UUID)
  *    tags: [Admin]
@@ -211,6 +212,91 @@ router.get(
   adminReadRateLimiter,
   validateRequest(adminSchema.userIdParamsSchema),
   adminController.getUserById,
+);
+
+/**
+ * @swagger
+ * /admin/users/{id}:
+ *   patch:
+ *     summary: Update a user's role and/or status (Admin-only)
+ *     description: Partially update a specific user's account role or status by their unique ID. At least one field (role or status) must be provided in the request body. Restricted to admin users only.
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         required: true
+ *         description: The unique identifier of the user (UUID)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [USER, ADMIN]
+ *                 description: "New account role to assign to the user"
+ *                 example: "ADMIN"
+ *               status:
+ *                 type: string
+ *                 enum: [ACTIVE, SUSPENDED, DEACTIVATED]
+ *                 description: "New account status to set for the user"
+ *                 example: "SUSPENDED"
+ *     responses:
+ *       200:
+ *         description: User updated successfully.
+ *         content:
+ *           application/json:
+ *            schema:
+ *              allOf:
+ *                - $ref: '#/components/schemas/ApiSuccess'
+ *                - type: object
+ *                  properties:
+ *                    data:
+ *                      type: object
+ *                      properties:
+ *                        user:
+ *                          $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Validation failed, empty update body, or invalid user ID format.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiValidationError'
+ *       401:
+ *         description: Unauthorized. Please provide valid authentication credentials.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *       403:
+ *         description: Forbidden. Insufficient permissions, self-demotion, or attempting to modify the last active admin.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *       404:
+ *         description: User not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *       429:
+ *         description: Too many requests. Rate limit exceeded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ */
+router.patch(
+  "/users/:id",
+  adminSensitiveMutationRateLimiter,
+  validateRequest(adminSchema.patchUserSchema),
+  adminController.patchUser,
 );
 
 export default router;

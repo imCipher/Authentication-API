@@ -180,6 +180,175 @@ class AdminService {
 
     return user;
   }
+
+  /**
+   * Updates a user's role and/or status.
+   * @param {string} id - The unique identifier of the user (UUID)
+   * @param {Object} updates - Object containing role and/or status to update
+   * @param {string} [updates.role] - New role for the user (USER or ADMIN)
+   * @param {string} [updates.status] - New status for the user (ACTIVE, SUSPENDED, DEACTIVATED)
+   * @param {Object} [context] - Execution context for authorization and auditing
+   * @param {string} [context.adminId] - ID of the admin performing the action (for auditing purposes).
+   * @param {string} [context.ip] - IP address of the request (for auditing purposes).
+   * @param {string} [context.userAgent] - User agent string of the request (for auditing purposes).
+   * @returns {Promise<Object|null>} - Returns the updated user object if successful, otherwise null
+   */
+  async updateUser(id, { role, status } = {}, { adminId, ip, userAgent } = {}) {
+    const cleanId = typeof id === "string" ? id.trim().toLowerCase() : "";
+
+    // Validate the id and ensure it is a valid UUID
+    if (!cleanId || !UUID_REGEX.test(cleanId)) {
+      throw ApiError.badRequest(
+        "User ID is required and must be a valid UUID.",
+      );
+    }
+
+    const normalizedRole =
+      role && typeof role === "string" ? role.trim().toUpperCase() : undefined;
+    const normalizedStatus =
+      status && typeof status === "string" ?
+        status.trim().toUpperCase()
+      : undefined;
+
+    // Validate role and status against allowed values
+    if (
+      role !== undefined &&
+      (!normalizedRole || !ALLOWED_ROLES.has(normalizedRole))
+    ) {
+      throw ApiError.badRequest(
+        "Invalid role. Must be either 'USER' or 'ADMIN'.",
+      );
+    }
+
+    if (
+      status !== undefined &&
+      (!normalizedStatus || !ALLOWED_STATUSES.has(normalizedStatus))
+    ) {
+      throw ApiError.badRequest(
+        "Invalid status. Must be either 'ACTIVE', 'SUSPENDED', or 'DEACTIVATED'.",
+      );
+    }
+
+    const data = {};
+
+    if (normalizedRole) {
+      data.role = normalizedRole;
+    }
+
+    if (normalizedStatus) {
+      data.status = normalizedStatus;
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw ApiError.badRequest(
+        "At least one of 'role' or 'status' must be provided for update.",
+      );
+    }
+
+    return await prisma.$transaction(async tx => {
+      // Fetch current target user state
+      const targetUser = await tx.user.findUnique({
+        where: { id: cleanId },
+        select: { id: true, role: true, status: true },
+      });
+
+      if (!targetUser) {
+        throw ApiError.notFound("User not found.");
+      }
+
+      // Prevent self-demotion or self-deactivation
+      if (adminId && adminId === targetUser.id) {
+        if (normalizedRole && normalizedRole !== targetUser.role) {
+          throw ApiError.forbidden(
+            "Administrators cannot change their own role.",
+          );
+        }
+        if (normalizedStatus && normalizedStatus !== "ACTIVE") {
+          throw ApiError.forbidden(
+            "Administrators cannot deactivate their own accounts.",
+          );
+        }
+      }
+
+      // Prevent locking out the last active admin
+      const isDemotingAdmin =
+        targetUser.role === "ADMIN" && normalizedRole === "USER";
+      const isDeactivatingAdmin =
+        targetUser.role === "ADMIN" &&
+        normalizedStatus &&
+        normalizedStatus !== "ACTIVE";
+
+      if (isDemotingAdmin || isDeactivatingAdmin) {
+        const activeAdminCount = await tx.user.count({
+          where: { role: "ADMIN", status: "ACTIVE" },
+        });
+        if (activeAdminCount <= 1) {
+          throw ApiError.badRequest(
+            "Operation rejected: Cannot demote or deactivate the last active administrator.",
+          );
+        }
+      }
+
+      // Invalidate sessions if role or status changes
+      const now = new Date();
+      const shouldRevokeSessions =
+        (normalizedRole && normalizedRole !== targetUser.role) ||
+        (normalizedStatus && normalizedStatus !== "ACTIVE");
+
+      if (shouldRevokeSessions) {
+        data.sessionsRevokedAt = now;
+
+        await tx.refreshToken.updateMany({
+          where: { userId: cleanId, revokedAt: null },
+          data: { revokedAt: now, graceToken: null },
+        });
+      }
+
+      // Update the user record
+      const updatedUser = await tx.user.update({
+        where: { id: cleanId },
+        data,
+        select: USER_DETAIL_SELECT,
+      });
+
+      // Record the admin action in the audit log
+      if (normalizedRole && normalizedRole !== targetUser.role) {
+        await tx.auditLog.create({
+          data: {
+            userId: adminId || null,
+            action: "ROLE_CHANGE",
+            resource: "USER",
+            details: {
+              targetUserId: cleanId,
+              previousRole: targetUser.role,
+              newRole: normalizedRole,
+            },
+            ipAddress: ip || null,
+            userAgent: userAgent || null,
+          },
+        });
+      }
+
+      if (normalizedStatus && normalizedStatus !== targetUser.status) {
+        await tx.auditLog.create({
+          data: {
+            userId: adminId || null,
+            action: "STATUS_CHANGE",
+            resource: "USER",
+            details: {
+              targetUserId: cleanId,
+              previousStatus: targetUser.status,
+              newStatus: normalizedStatus,
+            },
+            ipAddress: ip || null,
+            userAgent: userAgent || null,
+          },
+        });
+      }
+
+      return updatedUser;
+    });
+  }
 }
 
 export default new AdminService();

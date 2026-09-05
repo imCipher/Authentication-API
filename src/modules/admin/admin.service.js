@@ -302,6 +302,12 @@ class AdminService {
           where: { userId: cleanId, revokedAt: null },
           data: { revokedAt: now, graceToken: null },
         });
+
+        // Clear any grace tokens for the user to prevent re-authentication
+        await tx.refreshToken.updateMany({
+          where: { userId: cleanId, graceToken: { not: null } },
+          data: { graceToken: null },
+        });
       }
 
       // Update the user record
@@ -412,6 +418,12 @@ class AdminService {
         data: { revokedAt: now, graceToken: null },
       });
 
+      // Clear any grace tokens for the user to prevent re-authentication
+      await tx.refreshToken.updateMany({
+        where: { userId: cleanId, graceToken: { not: null } },
+        data: { graceToken: null },
+      });
+
       // Update the user record to reset failedAttempts and clear lockedUntil
       const updatedUser = await tx.user.update({
         where: { id: targetUser.id },
@@ -441,6 +453,79 @@ class AdminService {
       });
 
       return updatedUser;
+    });
+  }
+
+  /**
+   * Logs out a user from all devices by revoking all active refresh tokens and access tokens.
+   * @description This method is intended for administrative use to forcefully log out a user from all active sessions across all devices.
+   * It revokes all refresh tokens associated with the user and updates the sessionsRevokedAt timestamp to ensure that any existing access tokens are invalidated.
+   * @param {string} id - The unique identifier of the user (UUID)
+   * @param {Object} context - Execution context for authorization and auditing
+   * @param {string} [context.adminId] - ID of the admin performing the action (for auditing purposes).
+   * @param {string} [context.ip] - IP address of the request (for auditing purposes).
+   * @param {string} [context.userAgent] - User agent string of the request (for auditing purposes).
+   * @returns {Promise<void>} - Resolves when the operation is complete
+   */
+  async logoutUserFromAllDevices(id, { adminId, ip, userAgent } = {}) {
+    const cleanId = typeof id === "string" ? id.trim().toLowerCase() : "";
+
+    // Validate the id and ensure it is a valid UUID
+    if (!cleanId || !UUID_REGEX.test(cleanId)) {
+      throw ApiError.badRequest(
+        "User ID is required and must be a valid UUID.",
+      );
+    }
+
+    return await prisma.$transaction(async tx => {
+      // Fetch current target user state
+      const targetUser = await tx.user.findUnique({
+        where: { id: cleanId },
+        select: { id: true, username: true },
+      });
+
+      // Check if the user exists before proceeding
+      if (!targetUser) {
+        throw ApiError.notFound("User not found.");
+      }
+
+      const now = new Date();
+
+      // Revoke all active refresh tokens for the user
+      await tx.refreshToken.updateMany({
+        where: { userId: cleanId, revokedAt: null },
+        data: { revokedAt: now, graceToken: null },
+      });
+
+      // Clear any grace tokens for the user to prevent re-authentication
+      await tx.refreshToken.updateMany({
+        where: { userId: cleanId, graceToken: { not: null } },
+        data: { graceToken: null },
+      });
+
+      // Update the sessionsRevokedAt timestamp to invalidate existing access tokens
+      await tx.user.update({
+        where: { id: cleanId },
+        data: { sessionsRevokedAt: now },
+      });
+
+      // Record the admin action in the audit log
+      await tx.auditLog.create({
+        data: {
+          userId: adminId || null,
+          action: "LOGOUT_ALL",
+          resource: "USER",
+          details: {
+            message: `${targetUser.username} logged out from all devices by admin.`,
+            targetUserId: cleanId,
+          },
+          ipAddress: ip || null,
+          userAgent: userAgent || null,
+          success: true,
+        },
+      });
+
+      return targetUser.username; // Return the username for logging purposes
     });
   }
 }

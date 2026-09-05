@@ -89,16 +89,42 @@ const unlockUserAccount = CatchAsync(async (req, res) => {
   const adminId = req.user.id;
   const { userIp, userAgent } = getRequestMetadata(req);
 
-  const unlockedUser = await AdminService.unlockUserAccount(
-    id,
-    { adminId, ip: userIp, userAgent },
-  );
+  const unlockedUser = await AdminService.unlockUserAccount(id, {
+    adminId,
+    ip: userIp,
+    userAgent,
+  });
 
   if (!unlockedUser) {
     throw ApiError.notFound("User not found.");
   }
 
-  ApiResponse.success(res, "User account unlocked successfully.", { user: unlockedUser });
+  ApiResponse.success(res, "User account unlocked successfully.", {
+    user: unlockedUser,
+  });
+});
+
+/**
+ * @route POST /api/v1/admin/users/:id/logout-all
+ * @desc Log out a user from all devices (Admin-only)
+ * @access Private/Admin
+ */
+const logoutUserFromAllDevices = CatchAsync(async (req, res) => {
+  const { id } = req.validated.params;
+  const adminId = req.user.id;
+  const { userIp, userAgent } = getRequestMetadata(req);
+
+  const result = await AdminService.logoutUserFromAllDevices(id, {
+    adminId,
+    ip: userIp,
+    userAgent,
+  });
+  console.log("Logout result:", result); // Debug log
+
+  ApiResponse.success(
+    res,
+    `${result} logged out from all devices successfully.`,
+  );
 });
 
 export default {
@@ -106,4 +132,5 @@ export default {
   getUserById,
   updateUser,
   unlockUserAccount,
+  logoutUserFromAllDevices,
 };

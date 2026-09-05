@@ -366,4 +366,65 @@ router.post(
   validateRequest(adminSchema.userIdParamsSchema),
   adminController.unlockUserAccount,
 );
+
+/**
+ * @swagger
+ * /admin/users/{id}/logout-all:
+ *   post:
+ *    summary: Log out a user from all devices (Admin-only)
+ *    description: Log out a specific user from all devices by invalidating their active sessions. This endpoint is restricted to admin users only.
+ *    tags: [Admin]
+ *    parameters:
+ *      - in: path
+ *        name: id
+ *        schema:
+ *          type: string
+ *          format: uuid
+ *        required: true
+ *        description: The unique identifier of the user (UUID)
+ *    responses:
+ *      200:
+ *        description: User logged out from all devices successfully.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiSuccess'
+ *      400:
+ *         description: Validation failed, empty update body, or invalid user ID format.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiValidationError'
+ *      401:
+ *         description: Unauthorized. Please provide valid authentication credentials.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *      403:
+ *         description: Forbidden. Insufficient permissions, self-demotion, or attempting to modify the last active admin.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *      404:
+ *         description: User not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *      429:
+ *         description: Too many requests. Rate limit exceeded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ */
+router.post(
+  "/users/:id/logout-all",
+  adminSensitiveMutationRateLimiter,
+  validateRequest(adminSchema.userIdParamsSchema),
+  adminController.logoutUserFromAllDevices,
+);
+
 export default router;

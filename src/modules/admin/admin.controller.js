@@ -79,8 +79,31 @@ const updateUser = CatchAsync(async (req, res) => {
   ApiResponse.success(res, "User updated successfully.", { user: updatedUser });
 });
 
+/**
+ * @route POST /api/v1/admin/users/:id/unlock
+ * @desc Unlock a user's account (Admin-only)
+ * @access Private/Admin
+ */
+const unlockUserAccount = CatchAsync(async (req, res) => {
+  const { id } = req.validated.params;
+  const adminId = req.user.id;
+  const { userIp, userAgent } = getRequestMetadata(req);
+
+  const unlockedUser = await AdminService.unlockUserAccount(
+    id,
+    { adminId, ip: userIp, userAgent },
+  );
+
+  if (!unlockedUser) {
+    throw ApiError.notFound("User not found.");
+  }
+
+  ApiResponse.success(res, "User account unlocked successfully.", { user: unlockedUser });
+});
+
 export default {
   getUsers,
   getUserById,
   updateUser,
+  unlockUserAccount,
 };

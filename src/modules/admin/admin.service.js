@@ -325,6 +325,7 @@ class AdminService {
             },
             ipAddress: ip || null,
             userAgent: userAgent || null,
+            success: true,
           },
         });
       }
@@ -342,9 +343,102 @@ class AdminService {
             },
             ipAddress: ip || null,
             userAgent: userAgent || null,
+            success: true,
           },
         });
       }
+
+      return updatedUser;
+    });
+  }
+
+  /**
+   * Unlock a user's account by resetting failed login attempts and clearing any lockout.
+   * @description This method is intended for administrative use to unlock user accounts that have been locked due to failed login attempts or other security policies.
+   * It resets the failedAttempts counter and clears the lockedUntil timestamp, allowing the user to attempt to log in again.
+   * @param {string} id - The unique identifier of the user (UUID)
+   * @param {Object} context - Execution context for authorization and auditing
+   * @param {string} [context.adminId] - ID of the admin performing the action (for auditing purposes).
+   * @param {string} [context.ip] - IP address of the request (for auditing purposes).
+   * @param {string} [context.userAgent] - User agent string of the request (for auditing purposes).
+   * @returns {Promise<Object|null>} - Returns the updated user object if successful, otherwise null
+   */
+  async unlockUserAccount(id, { adminId, ip, userAgent } = {}) {
+    const cleanId = typeof id === "string" ? id.trim().toLowerCase() : "";
+
+    // Validate the id and ensure it is a valid UUID
+    if (!cleanId || !UUID_REGEX.test(cleanId)) {
+      throw ApiError.badRequest(
+        "User ID is required and must be a valid UUID.",
+      );
+    }
+
+    return await prisma.$transaction(async tx => {
+      // Fetch current target user state
+      const targetUser = await tx.user.findUnique({
+        where: { id: cleanId },
+        select: {
+          id: true,
+          failedAttempts: true,
+          lockedUntil: true,
+          status: true,
+        },
+      });
+
+      // We only need to check if the user exists; we don't need to fetch sensitive fields for unlocking
+      if (!targetUser) {
+        throw ApiError.notFound("User not found.");
+      }
+
+      // Ensure the user is in a state that can be unlocked
+      if (targetUser.status !== "ACTIVE") {
+        throw ApiError.badRequest(
+          `Cannot unlock an account with status '${targetUser.status}'. Please activate the account first.`,
+        );
+      }
+
+      const now = new Date();
+      const isLocked =
+        targetUser.failedAttempts > 0 ||
+        (targetUser.lockedUntil && targetUser.lockedUntil > now);
+
+      if (!isLocked) {
+        throw ApiError.badRequest("User account is not currently locked.");
+      }
+
+      //Invalidate Active Sessions
+      await tx.refreshToken.updateMany({
+        where: { userId: cleanId, revokedAt: null },
+        data: { revokedAt: now, graceToken: null },
+      });
+
+      // Update the user record to reset failedAttempts and clear lockedUntil
+      const updatedUser = await tx.user.update({
+        where: { id: targetUser.id },
+        data: {
+          failedAttempts: 0,
+          lockedUntil: null,
+          sessionsRevokedAt: now, // Invalidate sessions to ensure security
+        },
+        select: USER_DETAIL_SELECT,
+      });
+
+      // Record the admin action in the audit log
+      await tx.auditLog.create({
+        data: {
+          userId: adminId || null,
+          action: "ACCOUNT_UNLOCKED",
+          resource: "USER",
+          details: {
+            targetUserId: cleanId,
+            previousFailedAttempts: targetUser.failedAttempts,
+            previousLockedUntil: targetUser.lockedUntil,
+          },
+          ipAddress: ip || null,
+          userAgent: userAgent || null,
+          success: true,
+        },
+      });
 
       return updatedUser;
     });

@@ -299,5 +299,71 @@ router.patch(
   adminController.updateUser,
 );
 
-
+/**
+ * @swagger
+ * /admin/users/{id}/unlock:
+ *   post:
+ *    summary: Unlock a user's account (Admin-only)
+ *    description: Unlock a specific user's account that was locked due to multiple failed login attempts. This endpoint is restricted to admin users only.
+ *    tags: [Admin]
+ *    parameters:
+ *      - in: path
+ *        name: id
+ *        schema:
+ *          type: string
+ *          format: uuid
+ *        required: true
+ *        description: The unique identifier of the user (UUID)
+ *    responses:
+ *      200:
+ *         description: User updated successfully.
+ *         content:
+ *           application/json:
+ *            schema:
+ *              allOf:
+ *                - $ref: '#/components/schemas/ApiSuccess'
+ *                - type: object
+ *                  properties:
+ *                    data:
+ *                      type: object
+ *                      properties:
+ *                        user:
+ *                          $ref: '#/components/schemas/User'
+ *      400:
+ *         description: Validation failed, empty update body, or invalid user ID format.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiValidationError'
+ *      401:
+ *         description: Unauthorized. Please provide valid authentication credentials.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *      403:
+ *         description: Forbidden. Insufficient permissions, self-demotion, or attempting to modify the last active admin.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *      404:
+ *         description: User not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *      429:
+ *         description: Too many requests. Rate limit exceeded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ */
+router.post(
+  "/users/:id/unlock",
+  adminSensitiveMutationRateLimiter,
+  validateRequest(adminSchema.userIdParamsSchema),
+  adminController.unlockUserAccount,
+);
 export default router;

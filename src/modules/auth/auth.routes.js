@@ -273,11 +273,19 @@ router.post(
  *                example: "583nd0jn29jmdin9fnino28"
  *    responses:
  *      200:
- *        description: Token Refreshed Successfully
+ *        description: Login successful. Returns access and refresh tokens.
  *        content:
  *          application/json:
  *            schema:
- *              $ref: '#/components/schemas/ApiSuccess'
+ *              allOf:
+ *                - $ref: '#/components/schemas/ApiSuccess'
+ *                - type: object
+ *                  properties:
+ *                    data:
+ *                      type: object
+ *                      properties:
+ *                        tokens:
+ *                          $ref: '#/components/schemas/TokenPair'
  *      400:
  *        description: Bad request. Please check your input.
  *        content:

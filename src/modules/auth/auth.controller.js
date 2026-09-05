@@ -72,7 +72,7 @@ const refreshToken = CatchAsync(async (req, res, next) => {
     userAgent,
   });
 
-  ApiResponse.success(res, "Token refreshed successfully.", null, {
+  ApiResponse.success(res, "Token refreshed successfully.", {
     tokens: {
       accessToken: token.accessToken,
       refreshToken: token.refreshToken,

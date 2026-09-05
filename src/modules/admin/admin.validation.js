@@ -125,8 +125,51 @@ const patchUserSchema = {
     }),
 };
 
+/**
+ * Validation schema for querying audit logs with optional filters and pagination.
+ * Enforces that 'page' and 'limit' are positive integers, and validates optional filters.
+ */
+const getAuditLogsSchema = {
+  query: z.object({
+    page: z.preprocess(
+      emptyToUndefined,
+      z.coerce.number().int().min(1, "Page must be at least 1").default(1),
+    ),
+    limit: z.preprocess(
+      emptyToUndefined,
+      z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(100, "Limit cannot exceed 100")
+        .default(10),
+    ),
+    search: z.preprocess(
+      emptyToUndefined,
+      z
+        .string()
+        .trim()
+        .max(100, "Search query cannot exceed 100 characters")
+        .optional(),
+    ),
+    sortBy: z.preprocess(
+      emptyToUndefined,
+      z
+        .enum(["createdAt", "action", "adminId", "targetUserId"])
+        .default("createdAt"),
+    ),
+    sortOrder: z.preprocess(
+      val => {
+        const cleaned = emptyToUndefined(val);
+        return typeof cleaned === "string" ? cleaned.toLowerCase() : cleaned;
+      },
+      z.enum(["asc", "desc"]).default("desc"),
+    ),
+  }),
+};
 export default {
   getUsersSchema,
   userIdParamsSchema,
   patchUserSchema,
+  getAuditLogsSchema,
 };

@@ -602,6 +602,24 @@ class AdminService {
       return targetUser; // Return the deleted user's basic info for logging purposes
     });
   }
+
+  /**
+   * Fetches a paginated list of audit logs from the database with filtering and search.
+   * @param {Object} options - Query options
+   * @param {number} [options.page=1] - 1-based page number
+   * @param {number} [options.limit=10] - Number of records per page (capped at 100)
+   * @param {string} [options.search] - Search term matching email, username, or full name
+   * @param {string} [options.sortBy="createdAt"] - Field to sort by createdAt, action, adminId, targetUserId
+   * @param {"asc"|"desc"} [options.sortOrder="desc"] - Sort direction
+   * @returns {Promise<{ auditLogs: Array, pagination: Object }>}
+   */
+  async getAuditLogs({
+    page = 1,
+    limit = 10,
+    search,
+    sortBy = "createdAt",
+    sortOrder = "desc",
+  } = {}) {}
 }
 
 export default new AdminService();

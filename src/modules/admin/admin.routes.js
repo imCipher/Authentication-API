@@ -487,4 +487,11 @@ router.delete(
   adminController.deleteUser,
 );
 
+router.get(
+  "audit-logs",
+  adminReadRateLimiter,
+  validateRequest(adminSchema.getAuditLogsSchema),
+  adminController.getAuditLogs,
+);
+
 export default router;

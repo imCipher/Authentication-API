@@ -427,4 +427,64 @@ router.post(
   adminController.logoutUserFromAllDevices,
 );
 
+/**
+ * @swagger
+ * /admin/users/{id}:
+ *   delete:
+ *    summary: Delete a user account (Admin-only)
+ *    description: Permanently delete a specific user's account by their unique ID. This action is irreversible and restricted to admin users only.
+ *    tags: [Admin]
+ *    parameters:
+ *      - in: path
+ *        name: id
+ *        schema:
+ *          type: string
+ *          format: uuid
+ *        required: true
+ *        description: The unique identifier of the user (UUID)
+ *    responses:
+ *      200:
+ *        description: User deleted successfully.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/ApiSuccess'
+ *      400:
+ *         description: Validation failed, empty update body, or invalid user ID format.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiValidationError'
+ *      401:
+ *         description: Unauthorized. Please provide valid authentication credentials.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *      403:
+ *         description: Forbidden. Insufficient permissions, self-demotion, or attempting to modify the last active admin.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *      404:
+ *         description: User not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *      429:
+ *         description: Too many requests. Rate limit exceeded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ */
+router.delete(
+  "/users/:id",
+  adminSensitiveMutationRateLimiter,
+  validateRequest(adminSchema.userIdParamsSchema),
+  adminController.deleteUser,
+);
+
 export default router;

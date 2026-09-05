@@ -465,7 +465,7 @@ class AdminService {
    * @param {string} [context.adminId] - ID of the admin performing the action (for auditing purposes).
    * @param {string} [context.ip] - IP address of the request (for auditing purposes).
    * @param {string} [context.userAgent] - User agent string of the request (for auditing purposes).
-   * @returns {Promise<void>} - Resolves when the operation is complete
+   * @returns {Promise<string>} - Resolves when the operation is complete
    */
   async logoutUserFromAllDevices(id, { adminId, ip, userAgent } = {}) {
     const cleanId = typeof id === "string" ? id.trim().toLowerCase() : "";
@@ -526,6 +526,80 @@ class AdminService {
       });
 
       return targetUser.username; // Return the username for logging purposes
+    });
+  }
+
+  /**
+   * Deletes a user from the system.
+   * @description This method is intended for administrative use to permanently remove a user account from the system.
+   * It deletes the user record and all associated data, including refresh tokens and audit logs related to the user.
+   * @param {string} id - The unique identifier of the user (UUID)
+   * @param {Object} context - Execution context for authorization and auditing
+   * @param {string} [context.adminId] - ID of the admin performing the action (for auditing purposes).
+   * @param {string} [context.ip] - IP address of the request (for auditing purposes).
+   * @param {string} [context.userAgent] - User agent string of the request (for auditing purposes).
+   * @returns {Promise<Object|null>} - Returns the deleted user object if successful, otherwise null.
+   */
+  async deleteUser(id, { adminId, ip, userAgent } = {}) {
+    const cleanId = typeof id === "string" ? id.trim().toLowerCase() : "";
+
+    if (!cleanId || !UUID_REGEX.test(cleanId)) {
+      throw ApiError.badRequest(
+        "User ID is required and must be a valid UUID.",
+      );
+    }
+
+    return await prisma.$transaction(async tx => {
+      // Fetch current target user state
+      const targetUser = await tx.user.findUnique({
+        where: { id: cleanId },
+        select: { id: true, role: true, username: true, status: true },
+      });
+
+      // Check if the user exists before proceeding
+      if (!targetUser) {
+        throw ApiError.notFound("User not found.");
+      }
+
+      // Prevent self-deletion by the admin
+      if (adminId && adminId === cleanId) {
+        throw ApiError.forbidden("Admin cannot delete their own account.");
+      }
+
+      // Prevent deletion of the last active admin
+      if (targetUser.role === "ADMIN" && targetUser.status === "ACTIVE") {
+        const activeAdmins = await tx.user.count({
+          where: { role: "ADMIN", status: "ACTIVE" },
+        });
+        if (activeAdmins <= 1) {
+          throw ApiError.badRequest("Cannot delete the last active admin.");
+        }
+      }
+
+      // Record the admin action in the audit log
+      await tx.auditLog.create({
+        data: {
+          userId: adminId || null,
+          action: "ACCOUNT_DELETED",
+          resource: "USER",
+          details: {
+            targetUserId: cleanId,
+            targetUsername: targetUser.username,
+            targetRole: targetUser.role,
+            message: `User '${targetUser.username}' was permanently deleted by admin.`,
+          },
+          ipAddress: ip || null,
+          userAgent: userAgent || null,
+          success: true,
+        },
+      });
+
+      // Delete the user record and associated data
+      await tx.user.delete({
+        where: { id: cleanId },
+      });
+
+      return targetUser; // Return the deleted user's basic info for logging purposes
     });
   }
 }

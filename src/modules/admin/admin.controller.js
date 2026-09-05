@@ -127,10 +127,33 @@ const logoutUserFromAllDevices = CatchAsync(async (req, res) => {
   );
 });
 
+/**
+ * @route DELETE /api/v1/admin/users/:id
+ * @desc Delete a user (Admin-only)
+ * @access Private/Admin
+ */
+const deleteUser = CatchAsync(async (req, res) => {
+  const { id } = req.validated.params;
+  const adminId = req.user.id;
+  const { userIp, userAgent } = getRequestMetadata(req);
+
+  const deletedUser = await AdminService.deleteUser(id, {
+    adminId,
+    ip: userIp,
+    userAgent,
+  });
+
+  ApiResponse.success(
+    res,
+    `User ${deletedUser.username} deleted successfully.`,
+  );
+});
+
 export default {
   getUsers,
   getUserById,
   updateUser,
   unlockUserAccount,
   logoutUserFromAllDevices,
+  deleteUser,
 };

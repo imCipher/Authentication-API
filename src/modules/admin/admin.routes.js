@@ -296,7 +296,8 @@ router.patch(
   "/users/:id",
   adminSensitiveMutationRateLimiter,
   validateRequest(adminSchema.patchUserSchema),
-  adminController.patchUser,
+  adminController.updateUser,
 );
+
 
 export default router;

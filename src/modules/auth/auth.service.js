@@ -191,11 +191,11 @@ class AuthService {
         const lockDuration = 15 * 60 * 1000; // 15 minutes
         const lockedUntil = new Date(Date.now() + lockDuration);
         await prisma.$transaction([
-          await prisma.user.update({
+          prisma.user.update({
             where: { id: user.id },
             data: { lockedUntil, failedAttempts: 0 },
           }),
-          await prisma.auditLog.create({
+          prisma.auditLog.create({
             data: {
               userId: user.id,
               action: "ACCOUNT_LOCKED",
@@ -205,6 +205,7 @@ class AuthService {
               },
               ipAddress: metadata?.userIp || null,
               userAgent: metadata?.userAgent || null,
+              success: false,
             },
           }),
         ]);

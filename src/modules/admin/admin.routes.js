@@ -487,8 +487,193 @@ router.delete(
   adminController.deleteUser,
 );
 
+/**
+ * @swagger
+ * /admin/audit-logs:
+ *   get:
+ *     summary: Fetch a paginated list of audit logs with optional filters (Admin-only)
+ *     description: Retrieve a paginated list of system audit logs with optional searching and sorting. Restricted to admin users only.
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Number of records to return per page (maximum 100)
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *           maxLength: 100
+ *         description: Search term matching actor (email, username, full name), IP address, resource, or details context
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, action, adminId, targetUserId]
+ *           default: createdAt
+ *         description: Field to sort the results by (default: createdAt)
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Order to sort the results by (default: desc)
+ *     responses:
+ *       200:
+ *         description: Audit logs retrieved successfully with pagination metadata.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiSuccess'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         auditLogs:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               id:
+ *                                 type: string
+ *                                 format: uuid
+ *                                 example: "716676c0-0fc4-4d58-ae24-baf33d865e12"
+ *                               userId:
+ *                                 type: string
+ *                                 format: uuid
+ *                                 nullable: true
+ *                                 example: "4b92b0c3-f09c-4874-8aa7-71bbf5ef5cf6"
+ *                               action:
+ *                                 type: string
+ *                                 enum:
+ *                                   - PASSWORD_CHANGE
+ *                                   - PASSWORD_RESET
+ *                                   - EMAIL_CHANGE
+ *                                   - EMAIL_VERIFIED
+ *                                   - ROLE_CHANGE
+ *                                   - STATUS_CHANGE
+ *                                   - ACCOUNT_UNLOCKED
+ *                                   - OAUTH_ACCOUNT_LINKED
+ *                                   - TOKEN_REUSE_DETECTED
+ *                                   - LOGOUT_ALL
+ *                                   - ACCOUNT_DELETED
+ *                                   - ACCOUNT_LOCKED
+ *                                 example: "ROLE_CHANGE"
+ *                               resource:
+ *                                 type: string
+ *                                 nullable: true
+ *                                 example: "USER"
+ *                               details:
+ *                                 type: object
+ *                                 nullable: true
+ *                                 example:
+ *                                   targetUserId: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+ *                                   previousRole: "USER"
+ *                                   newRole: "ADMIN"
+ *                               ipAddress:
+ *                                 type: string
+ *                                 nullable: true
+ *                                 example: "192.168.1.1"
+ *                               userAgent:
+ *                                 type: string
+ *                                 nullable: true
+ *                                 example: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)..."
+ *                               success:
+ *                                 type: boolean
+ *                                 example: true
+ *                               createdAt:
+ *                                 type: string
+ *                                 format: date-time
+ *                                 example: "2026-09-06T12:00:00.000Z"
+ *                               user:
+ *                                 type: object
+ *                                 nullable: true
+ *                                 properties:
+ *                                   id:
+ *                                     type: string
+ *                                     format: uuid
+ *                                     example: "4b92b0c3-f09c-4874-8aa7-71bbf5ef5cf6"
+ *                                   fullName:
+ *                                     type: string
+ *                                     example: "Admin User"
+ *                                   username:
+ *                                     type: string
+ *                                     example: "admin_user"
+ *                                   email:
+ *                                     type: string
+ *                                     format: email
+ *                                     example: "admin@example.com"
+ *                                   role:
+ *                                     type: string
+ *                                     example: "ADMIN"
+ *                         pagination:
+ *                           type: object
+ *                           properties:
+ *                             totalCount:
+ *                               type: integer
+ *                               example: 150
+ *                               description: Total number of audit logs matching the query
+ *                             totalPages:
+ *                               type: integer
+ *                               example: 15
+ *                               description: Total number of pages
+ *                             currentPage:
+ *                               type: integer
+ *                               example: 1
+ *                               description: Current page number
+ *                             limit:
+ *                               type: integer
+ *                               example: 10
+ *                               description: Number of records per page
+ *                             hasNextPage:
+ *                               type: boolean
+ *                               example: true
+ *                               description: Indicates if there is a next page
+ *                             hasPrevPage:
+ *                               type: boolean
+ *                               example: false
+ *                               description: Indicates if there is a previous page
+ *       400:
+ *         description: Validation failed. Invalid query parameters provided.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiValidationError'
+ *       401:
+ *         description: Unauthorized. Please provide valid authentication credentials.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *       403:
+ *         description: Forbidden. Insufficient permissions, admin access required.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *       429:
+ *         description: Too many requests. Rate limit exceeded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ */
 router.get(
-  "audit-logs",
+  "/audit-logs",
   adminReadRateLimiter,
   validateRequest(adminSchema.getAuditLogsSchema),
   adminController.getAuditLogs,

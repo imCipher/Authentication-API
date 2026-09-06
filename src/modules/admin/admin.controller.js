@@ -155,12 +155,14 @@ const deleteUser = CatchAsync(async (req, res) => {
  * @access Private/Admin
  */
 const getAuditLogs = CatchAsync(async (req, res) => {
-  const { page, limit, search, sortBy, sortOrder } = req.validated.query;
+  const { page, limit, search, action, sortBy, sortOrder } =
+    req.validated.query;
 
   const { auditLogs, pagination } = await AdminService.getAuditLogs({
     page,
     limit,
     search,
+    action,
     sortBy,
     sortOrder,
   });

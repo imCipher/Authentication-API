@@ -152,6 +152,28 @@ const getAuditLogsSchema = {
         .max(100, "Search query cannot exceed 100 characters")
         .optional(),
     ),
+    action: z.preprocess(
+      val => {
+        const cleaned = emptyToUndefined(val);
+        return typeof cleaned === "string" ? cleaned.toUpperCase() : cleaned;
+      },
+      z
+        .enum([
+          "PASSWORD_CHANGE",
+          "PASSWORD_RESET",
+          "EMAIL_CHANGE",
+          "EMAIL_VERIFIED",
+          "ROLE_CHANGE",
+          "STATUS_CHANGE",
+          "ACCOUNT_UNLOCKED",
+          "OAUTH_ACCOUNT_LINKED",
+          "TOKEN_REUSE_DETECTED",
+          "LOGOUT_ALL",
+          "ACCOUNT_DELETED",
+          "ACCOUNT_LOCKED",
+        ])
+        .optional(),
+    ),
     sortBy: z.preprocess(
       emptyToUndefined,
       z

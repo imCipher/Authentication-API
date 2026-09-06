@@ -48,6 +48,31 @@ const USER_DETAIL_SELECT = {
   },
 };
 
+/**
+ * Safe projection for audit log entries in admin views.
+ * Includes basic actor infor while preventing overfetching.
+ */
+const AUDIT_LOG_SELECT = {
+  id: true,
+  userId: true,
+  action: true,
+  resource: true,
+  details: true,
+  ipAddress: true,
+  userAgent: true,
+  success: true,
+  createdAt: true,
+  user: {
+    select: {
+      id: true,
+      username: true,
+      fullName: true,
+      email: true,
+      role: true,
+    },
+  },
+};
+
 // UUID regex pattern for validating UUID strings (v1-v5)
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -608,8 +633,9 @@ class AdminService {
    * @param {Object} options - Query options
    * @param {number} [options.page=1] - 1-based page number
    * @param {number} [options.limit=10] - Number of records per page (capped at 100)
-   * @param {string} [options.search] - Search term matching email, username, or full name
-   * @param {string} [options.sortBy="createdAt"] - Field to sort by createdAt, action, adminId, targetUserId
+   * @param {string} [options.search] - Free-text search term matching actor (email, username, name), IP, resource, or details message
+   * @param {string} [options.action] - Optional filter for specific AuditAction enum
+   * @param {string} [options.sortBy="createdAt"] - Field to sort by createdAt, action or userId
    * @param {"asc"|"desc"} [options.sortOrder="desc"] - Sort direction
    * @returns {Promise<{ auditLogs: Array, pagination: Object }>}
    */
@@ -617,9 +643,75 @@ class AdminService {
     page = 1,
     limit = 10,
     search,
+    action,
     sortBy = "createdAt",
     sortOrder = "desc",
-  } = {}) {}
+  } = {}) {
+    const safePage = Math.max(1, parseInt(page, 10) || 1);
+    const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
+    const skip = (safePage - 1) * safeLimit;
+
+    const where = {};
+
+    // Filter by specific action if provided and valid
+    if (action && typeof action === "string" && action.trim()) {
+      where.action = action.trim().toUpperCase();
+    }
+
+    // Free-text search across actor details, IP address, resource, and details message
+    if (search && typeof search === "string" && search.trim()) {
+      const query = search.trim();
+      where.OR = [
+        {
+          user: { is: { username: { contains: query, mode: "insensitive" } } },
+        },
+        { user: { is: { email: { contains: query, mode: "insensitive" } } } },
+        {
+          user: { is: { fullName: { contains: query, mode: "insensitive" } } },
+        },
+        { ipAddress: { contains: query, mode: "insensitive" } },
+        { resource: { contains: query, mode: "insensitive" } },
+        { details: { path: ["message"], string_contains: query } },
+        { details: { path: ["targetUsername"], string_contains: query } },
+      ];
+
+      // Match UUID directly on primary key or userId if query is a valid UUID
+      if (UUID_REGEX.test(query)) {
+        where.OR.push({ id: query.toLowerCase() });
+        where.OR.push({ userId: query.toLowerCase() });
+      }
+    }
+
+    // Map and whitelist sort fields against valid AuditLog columns
+    const allowedSortFields = new Set(["createdAt", "action", "userId"]);
+    const safeSortBy = allowedSortFields.has(sortBy) ? sortBy : "createdAt";
+    const safeSortOrder = sortOrder === "asc" ? "asc" : "desc";
+
+    const [auditLogs, totalCount] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        select: AUDIT_LOG_SELECT,
+        skip,
+        take: safeLimit,
+        orderBy: [{ [safeSortBy]: safeSortOrder }, { id: safeSortOrder }],
+      }),
+      prisma.auditLog.count({ where }),
+    ]);
+
+    const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / safeLimit);
+
+    return {
+      auditLogs,
+      pagination: {
+        totalCount,
+        totalPages,
+        currentPage: safePage,
+        limit: safeLimit,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1 && totalCount > 0,
+      },
+    };
+  }
 }
 
 export default new AdminService();

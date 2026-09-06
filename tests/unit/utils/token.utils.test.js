@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+// import { describe, it, expect } from "vitest";
 import tokenUtils from "../../../src/utils/token.utils.js";
 import ApiError from "../../../src/utils/ApiError.js";
 
@@ -33,6 +33,8 @@ describe("Token Utilities", () => {
         expect(error.code).toBe("TOKEN_INVALID");
       }
     });
+
+    // TODO: Add a test for expired tokens. This requires mocking the system time or using a library like `sinon` to simulate token expiration.
   });
 
   describe("signRefreshToken & secureToken", () => {

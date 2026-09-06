@@ -34,7 +34,32 @@ describe("Token Utilities", () => {
       }
     });
 
-    // TODO: Add a test for expired tokens. This requires mocking the system time or using a library like `sinon` to simulate token expiration.
+    it("should throw an unauthorized ApiError with code TOKEN_EXPIRED for expired tokens", () => {
+      // Tell Vitest to take control of the system time
+      vi.useFakeTimers();
+
+      try {
+        // Sign a valid access token (expires in 15m by default)
+        const token = tokenUtils.signAccessToken(mockUser);
+
+        // Fast-forward time by 16 minutes to simulate expiration
+        vi.advanceTimersByTime(16 * 60 * 1000); // 16 minutes in milliseconds
+
+        //verify that it throws an ApiError with TOKEN_EXPIRED code
+        expect(() => tokenUtils.verifyAccessToken(token)).toThrow(ApiError);
+
+        try {
+          tokenUtils.verifyAccessToken(token);
+        } catch (error) {
+          expect(error.statusCode).toBe(401);
+          expect(error.code).toBe("TOKEN_EXPIRED");
+          expect(error.message).toBe("Access token expired.");
+        }
+      } finally {
+        // Always restore real timers so subsequent tests are not affected
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe("signRefreshToken & secureToken", () => {

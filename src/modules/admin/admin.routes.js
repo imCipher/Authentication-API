@@ -720,14 +720,14 @@ router.get(
  *           type: string
  *           enum: [createdAt, success, userId]
  *           default: createdAt
- *         description: Field to sort the results by (default: createdAt)
+ *         description: "Field to sort the results by (default: createdAt)"
  *       - in: query
  *         name: sortOrder
  *         schema:
  *           type: string
  *           enum: [asc, desc]
  *           default: desc
- *         description: Order to sort the results by (default: desc)
+ *         description: "Order to sort the results by (default: desc)"
  *     responses:
  *       200:
  *         description: Login history retrieved successfully with pagination metadata.

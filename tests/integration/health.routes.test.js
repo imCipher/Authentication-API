@@ -11,8 +11,13 @@ vi.mock("../../src/config/redis.js", () => ({
   default: {
     exists: vi.fn().mockResolvedValue(true),
     incrWithExpire: vi.fn().mockResolvedValue(1),
+    waitUntilReady: vi.fn().mockResolvedValue({
+      call: vi.fn().mockResolvedValue("OK"),
+    }),
+    isConnected: vi.fn().mockReturnValue(false),
   },
 }));
+
 
 describe("Health Check Route", () => {
   it("Get /api/v1/health should return 200 and system health status", async () => {

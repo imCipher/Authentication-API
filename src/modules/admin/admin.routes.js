@@ -517,19 +517,25 @@ router.delete(
  *           maxLength: 100
  *         description: Search term matching actor (email, username, full name), IP address, resource, or details context
  *       - in: query
+ *         name: action
+ *         schema:
+ *           type: string
+ *           enum: [PASSWORD_CHANGE, PASSWORD_RESET, EMAIL_CHANGE, EMAIL_VERIFIED, ROLE_CHANGE, STATUS_CHANGE, ACCOUNT_UNLOCKED, OAUTH_ACCOUNT_LINKED, TOKEN_REUSE_DETECTED, LOGOUT_ALL, ACCOUNT_DELETED, ACCOUNT_LOCKED]
+ *         description: Filter audit logs by specific action type
+ *       - in: query
  *         name: sortBy
  *         schema:
  *           type: string
  *           enum: [createdAt, action, adminId, targetUserId]
  *           default: createdAt
- *         description: Field to sort the results by (default: createdAt)
+ *         description: "Field to sort the results by (default: createdAt)"
  *       - in: query
  *         name: sortOrder
  *         schema:
  *           type: string
  *           enum: [asc, desc]
  *           default: desc
- *         description: Order to sort the results by (default: desc)
+ *         description: "Order to sort the results by (default: desc)"
  *     responses:
  *       200:
  *         description: Audit logs retrieved successfully with pagination metadata.

@@ -685,4 +685,167 @@ router.get(
   adminController.getAuditLogs,
 );
 
+/**
+ * @swagger
+ * /admin/login-history:
+ *   get:
+ *     summary: Fetch a paginated list of login history (Admin-only)
+ *     description: Retrieve a paginated list of user login history records with optional user filtering and sorting. Restricted to admin users only.
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Number of records to return per page (maximum 100)
+ *       - in: query
+ *         name: userId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Optional filter to retrieve login history for a specific user ID (UUID)
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, success, userId]
+ *           default: createdAt
+ *         description: Field to sort the results by (default: createdAt)
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Order to sort the results by (default: desc)
+ *     responses:
+ *       200:
+ *         description: Login history retrieved successfully with pagination metadata.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiSuccess'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         loginHistory:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               id:
+ *                                 type: string
+ *                                 format: uuid
+ *                                 example: "c765f029-dfa9-4672-911e-289b4f62bfd7"
+ *                               userId:
+ *                                 type: string
+ *                                 format: uuid
+ *                                 example: "4b92b0c3-f09c-4874-8aa7-71bbf5ef5cf6"
+ *                               ipAddress:
+ *                                 type: string
+ *                                 example: "192.168.1.100"
+ *                               userAgent:
+ *                                 type: string
+ *                                 nullable: true
+ *                                 example: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+ *                               success:
+ *                                 type: boolean
+ *                                 example: true
+ *                               reason:
+ *                                 type: string
+ *                                 nullable: true
+ *                                 example: null
+ *                               createdAt:
+ *                                 type: string
+ *                                 format: date-time
+ *                                 example: "2026-09-06T12:00:00.000Z"
+ *                               user:
+ *                                 type: object
+ *                                 properties:
+ *                                   id:
+ *                                     type: string
+ *                                     format: uuid
+ *                                     example: "4b92b0c3-f09c-4874-8aa7-71bbf5ef5cf6"
+ *                                   username:
+ *                                     type: string
+ *                                     example: "johndoe"
+ *                                   fullName:
+ *                                     type: string
+ *                                     example: "John Doe"
+ *                                   email:
+ *                                     type: string
+ *                                     format: email
+ *                                     example: "john@example.com"
+ *                         pagination:
+ *                           type: object
+ *                           properties:
+ *                             totalCount:
+ *                               type: integer
+ *                               example: 45
+ *                               description: Total number of login records matching the query
+ *                             totalPages:
+ *                               type: integer
+ *                               example: 5
+ *                               description: Total number of pages
+ *                             currentPage:
+ *                               type: integer
+ *                               example: 1
+ *                               description: Current page number
+ *                             limit:
+ *                               type: integer
+ *                               example: 10
+ *                               description: Number of records per page
+ *                             hasNextPage:
+ *                               type: boolean
+ *                               example: true
+ *                               description: Indicates if there is a next page
+ *                             hasPrevPage:
+ *                               type: boolean
+ *                               example: false
+ *                               description: Indicates if there is a previous page
+ *       400:
+ *         description: Validation failed. Invalid query parameters provided.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiValidationError'
+ *       401:
+ *         description: Unauthorized. Please provide valid authentication credentials.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *       403:
+ *         description: Forbidden. Insufficient permissions, admin access required.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ *       429:
+ *         description: Too many requests. Rate limit exceeded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ */
+router.get(
+  "/login-history",
+  adminReadRateLimiter,
+  validateRequest(adminSchema.getLoginHistorySchema),
+  adminController.getLoginHistory,
+);
+
 export default router;

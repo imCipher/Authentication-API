@@ -712,6 +712,89 @@ class AdminService {
       },
     };
   }
+
+  /**
+   * Get a paginated list of login history with optional filters.
+   * @param {Object} options - The options for fetching login history.
+   * @param {number} [options.page=1] - The page number to fetch.
+   * @param {number} [options.limit=10] - The number of items to fetch per page.
+   * @param {string} options.userId - The ID of the user to filter by.
+   * @param {string} [options.sortBy="createdAt"] - The field to sort by.
+   * @param {"asc" | "desc"} [options.sortOrder="desc"] - Sort direction.
+   * @returns {Promise<{loginHistory: Array, pagination: Object}>} - A promise resolving to the login history and pagination information.
+   */
+  async getLoginHistory({
+    page = 1,
+    limit = 10,
+    userId,
+    sortBy = "createdAt",
+    sortOrder = "desc",
+  } = {}) {
+    const safePage = Math.max(1, parseInt(page, 10) || 1);
+    const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
+    const skip = (safePage - 1) * safeLimit;
+
+    const where = {};
+
+    if (
+      userId &&
+      typeof userId === "string" &&
+      UUID_REGEX.test(userId.trim())
+    ) {
+      where.userId = userId.trim().toLowerCase();
+    }
+
+    const allowedSortFields = new Set(["createdAt", "success", "userId"]);
+    const safeSortBy = allowedSortFields.has(sortBy) ? sortBy : "createdAt";
+    const safeSortOrder = sortOrder === "asc" ? "asc" : "desc";
+
+    const orderBy = [
+      { [safeSortBy]: safeSortOrder },
+      ...(safeSortBy !== "createdAt" ? [{ createdAt: "desc" }] : []),
+      { id: safeSortOrder },
+    ];
+
+    const [loginHistory, totalCount] = await Promise.all([
+      prisma.loginHistory.findMany({
+        where,
+        select: {
+          id: true,
+          userId: true,
+          ipAddress: true,
+          userAgent: true,
+          success: true,
+          reason: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              username: true,
+              fullName: true,
+              email: true,
+            },
+          },
+        },
+        skip,
+        take: safeLimit,
+        orderBy,
+      }),
+      prisma.loginHistory.count({ where }),
+    ]);
+
+    const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / safeLimit);
+
+    return {
+      loginHistory,
+      pagination: {
+        totalCount,
+        totalPages,
+        currentPage: safePage,
+        limit: safeLimit,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1 && totalCount > 0,
+      },
+    };
+  }
 }
 
 export default new AdminService();

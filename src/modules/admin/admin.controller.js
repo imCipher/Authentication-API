@@ -173,6 +173,28 @@ const getAuditLogs = CatchAsync(async (req, res) => {
   });
 });
 
+/**
+ * @route GET /api/v1/admin/login-history
+ * @desc Get a paginated list of login history with optional filters (Admin-only)
+ * @access Private/Admin
+ */
+const getLoginHistory = CatchAsync(async (req, res) => {
+  const { page, limit, userId, sortBy, sortOrder } = req.validated.query;
+
+  const { loginHistory, pagination } = await AdminService.getLoginHistory({
+    page,
+    limit,
+    userId,
+    sortBy,
+    sortOrder,
+  });
+
+  ApiResponse.success(res, "Login history retrieved successfully.", {
+    loginHistory,
+    pagination,
+  });
+});
+
 export default {
   getUsers,
   getUserById,
@@ -181,4 +203,5 @@ export default {
   logoutUserFromAllDevices,
   deleteUser,
   getAuditLogs,
+  getLoginHistory,
 };

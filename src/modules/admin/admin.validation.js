@@ -51,44 +51,46 @@ const userStatusSchema = z.preprocess(
  * Enforces pagination, filtering, searching, and sorting rules.
  */
 const getUsersSchema = {
-  query: z.object({
-    page: z.preprocess(
-      emptyToUndefined,
-      z.coerce.number().int().min(1, "Page must be at least 1").default(1),
-    ),
-    limit: z.preprocess(
-      emptyToUndefined,
-      z.coerce
-        .number()
-        .int()
-        .min(1)
-        .max(100, "Limit cannot exceed 100")
-        .default(10),
-    ),
-    role: userRoleSchema.optional(),
-    status: userStatusSchema.optional(),
-    search: z.preprocess(
-      emptyToUndefined,
-      z
-        .string()
-        .trim()
-        .max(100, "Search query cannot exceed 100 characters")
-        .optional(),
-    ),
-    sortBy: z.preprocess(
-      emptyToUndefined,
-      z
-        .enum(["createdAt", "fullName", "email", "username", "lastLoginAt"])
-        .default("createdAt"),
-    ),
-    sortOrder: z.preprocess(
-      val => {
-        const cleaned = emptyToUndefined(val);
-        return typeof cleaned === "string" ? cleaned.toLowerCase() : cleaned;
-      },
-      z.enum(["asc", "desc"]).default("desc"),
-    ),
-  }),
+  query: z
+    .object({
+      page: z.preprocess(
+        emptyToUndefined,
+        z.coerce.number().int().min(1, "Page must be at least 1").default(1),
+      ),
+      limit: z.preprocess(
+        emptyToUndefined,
+        z.coerce
+          .number()
+          .int()
+          .min(1)
+          .max(100, "Limit cannot exceed 100")
+          .default(10),
+      ),
+      role: userRoleSchema.optional(),
+      status: userStatusSchema.optional(),
+      search: z.preprocess(
+        emptyToUndefined,
+        z
+          .string()
+          .trim()
+          .max(100, "Search query cannot exceed 100 characters")
+          .optional(),
+      ),
+      sortBy: z.preprocess(
+        emptyToUndefined,
+        z
+          .enum(["createdAt", "fullName", "email", "username", "lastLoginAt"])
+          .default("createdAt"),
+      ),
+      sortOrder: z.preprocess(
+        val => {
+          const cleaned = emptyToUndefined(val);
+          return typeof cleaned === "string" ? cleaned.toLowerCase() : cleaned;
+        },
+        z.enum(["asc", "desc"]).default("desc"),
+      ),
+    })
+    .strict(),
 };
 
 /**
@@ -130,6 +132,70 @@ const patchUserSchema = {
  * Enforces that 'page' and 'limit' are positive integers, and validates optional filters.
  */
 const getAuditLogsSchema = {
+  query: z
+    .object({
+      page: z.preprocess(
+        emptyToUndefined,
+        z.coerce.number().int().min(1, "Page must be at least 1").default(1),
+      ),
+      limit: z.preprocess(
+        emptyToUndefined,
+        z.coerce
+          .number()
+          .int()
+          .min(1)
+          .max(100, "Limit cannot exceed 100")
+          .default(10),
+      ),
+      search: z.preprocess(
+        emptyToUndefined,
+        z
+          .string()
+          .trim()
+          .max(100, "Search query cannot exceed 100 characters")
+          .optional(),
+      ),
+      action: z.preprocess(
+        val => {
+          const cleaned = emptyToUndefined(val);
+          return typeof cleaned === "string" ? cleaned.toUpperCase() : cleaned;
+        },
+        z
+          .enum([
+            "PASSWORD_CHANGE",
+            "PASSWORD_RESET",
+            "EMAIL_CHANGE",
+            "EMAIL_VERIFIED",
+            "ROLE_CHANGE",
+            "STATUS_CHANGE",
+            "ACCOUNT_UNLOCKED",
+            "OAUTH_ACCOUNT_LINKED",
+            "TOKEN_REUSE_DETECTED",
+            "LOGOUT_ALL",
+            "ACCOUNT_DELETED",
+            "ACCOUNT_LOCKED",
+          ])
+          .optional(),
+      ),
+      sortBy: z.preprocess(
+        emptyToUndefined,
+        z.enum(["createdAt", "action", "userId"]).default("createdAt"),
+      ),
+      sortOrder: z.preprocess(
+        val => {
+          const cleaned = emptyToUndefined(val);
+          return typeof cleaned === "string" ? cleaned.toLowerCase() : cleaned;
+        },
+        z.enum(["asc", "desc"]).default("desc"),
+      ),
+    })
+    .strict(),
+};
+/**
+ * Validation schema for querying login history with optional filters and pagination.
+ * Enforces that 'page' and 'limit' are positive integers, and validates optional filters.
+ */
+const getLoginHistorySchema = {
   query: z.object({
     page: z.preprocess(
       emptyToUndefined,
@@ -144,41 +210,13 @@ const getAuditLogsSchema = {
         .max(100, "Limit cannot exceed 100")
         .default(10),
     ),
-    search: z.preprocess(
+    userId: z.preprocess(
       emptyToUndefined,
-      z
-        .string()
-        .trim()
-        .max(100, "Search query cannot exceed 100 characters")
-        .optional(),
-    ),
-    action: z.preprocess(
-      val => {
-        const cleaned = emptyToUndefined(val);
-        return typeof cleaned === "string" ? cleaned.toUpperCase() : cleaned;
-      },
-      z
-        .enum([
-          "PASSWORD_CHANGE",
-          "PASSWORD_RESET",
-          "EMAIL_CHANGE",
-          "EMAIL_VERIFIED",
-          "ROLE_CHANGE",
-          "STATUS_CHANGE",
-          "ACCOUNT_UNLOCKED",
-          "OAUTH_ACCOUNT_LINKED",
-          "TOKEN_REUSE_DETECTED",
-          "LOGOUT_ALL",
-          "ACCOUNT_DELETED",
-          "ACCOUNT_LOCKED",
-        ])
-        .optional(),
+      userIdParam.optional(),
     ),
     sortBy: z.preprocess(
       emptyToUndefined,
-      z
-        .enum(["createdAt", "action", "adminId", "targetUserId"])
-        .default("createdAt"),
+      z.enum(["createdAt", "success", "userId"]).default("createdAt"),
     ),
     sortOrder: z.preprocess(
       val => {
@@ -187,11 +225,12 @@ const getAuditLogsSchema = {
       },
       z.enum(["asc", "desc"]).default("desc"),
     ),
-  }),
+  }).strict(),
 };
 export default {
   getUsersSchema,
   userIdParamsSchema,
   patchUserSchema,
   getAuditLogsSchema,
+  getLoginHistorySchema,
 };

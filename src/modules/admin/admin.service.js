@@ -647,6 +647,7 @@ class AdminService {
     sortBy = "createdAt",
     sortOrder = "desc",
   } = {}) {
+    // Sanitize and defensively bound pagination
     const safePage = Math.max(1, parseInt(page, 10) || 1);
     const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
     const skip = (safePage - 1) * safeLimit;
@@ -730,12 +731,14 @@ class AdminService {
     sortBy = "createdAt",
     sortOrder = "desc",
   } = {}) {
+    // Sanitize and defensively bound pagination
     const safePage = Math.max(1, parseInt(page, 10) || 1);
     const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
     const skip = (safePage - 1) * safeLimit;
 
     const where = {};
 
+    // Validate and sanitize userId filter
     if (
       userId &&
       typeof userId === "string" &&
@@ -744,6 +747,7 @@ class AdminService {
       where.userId = userId.trim().toLowerCase();
     }
 
+    // Whitelist allowed sort fields for login history
     const allowedSortFields = new Set(["createdAt", "success", "userId"]);
     const safeSortBy = allowedSortFields.has(sortBy) ? sortBy : "createdAt";
     const safeSortOrder = sortOrder === "asc" ? "asc" : "desc";
@@ -754,6 +758,7 @@ class AdminService {
       { id: safeSortOrder },
     ];
 
+    // Fetch records and total count concurrently for efficiency
     const [loginHistory, totalCount] = await Promise.all([
       prisma.loginHistory.findMany({
         where,

@@ -69,10 +69,13 @@ describe("ApiError", () => {
       [502, "error"],
       [503, "error"],
       [301, "error"],
-    ])("should assign status '%s' for HTTP status code %i", (statusCode, expectedStatus) => {
-      const error = new ApiError("Test message", statusCode);
-      expect(error.status).toBe(expectedStatus);
-    });
+    ])(
+      "should assign status '%s' for HTTP status code %i",
+      (statusCode, expectedStatus) => {
+        const error = new ApiError("Test message", statusCode);
+        expect(error.status).toBe(expectedStatus);
+      },
+    );
   });
 
   describe("Machine-readable error code resolution", () => {
@@ -92,10 +95,13 @@ describe("ApiError", () => {
       [409, "CONFLICT"],
       [429, "RATE_LIMITED"],
       [500, "INTERNAL_ERROR"],
-    ])("should resolve default code for status %i to %s", (statusCode, expectedCode) => {
-      const error = new ApiError("Code mapping test", statusCode);
-      expect(error.code).toBe(expectedCode);
-    });
+    ])(
+      "should resolve default code for status %i to %s",
+      (statusCode, expectedCode) => {
+        const error = new ApiError("Code mapping test", statusCode);
+        expect(error.code).toBe(expectedCode);
+      },
+    );
 
     it("should fallback to 'CLIENT_ERROR' for unknown 4xx status codes", () => {
       const error = new ApiError("Unprocessable entity", 422);
@@ -224,9 +230,12 @@ describe("ApiError", () => {
       });
 
       it("should accept custom message and options", () => {
-        const error = ApiError.forbidden("You do not have administrative privileges", {
-          code: "INSUFFICIENT_PERMISSIONS",
-        });
+        const error = ApiError.forbidden(
+          "You do not have administrative privileges",
+          {
+            code: "INSUFFICIENT_PERMISSIONS",
+          },
+        );
 
         expect(error.message).toBe("You do not have administrative privileges");
         expect(error.statusCode).toBe(403);
@@ -292,9 +301,12 @@ describe("ApiError", () => {
       });
 
       it("should accept custom message and options", () => {
-        const error = ApiError.tooManyRequests("Rate limit exceeded for login attempts", {
-          code: "AUTH_RATE_LIMIT_EXCEEDED",
-        });
+        const error = ApiError.tooManyRequests(
+          "Rate limit exceeded for login attempts",
+          {
+            code: "AUTH_RATE_LIMIT_EXCEEDED",
+          },
+        );
 
         expect(error.message).toBe("Rate limit exceeded for login attempts");
         expect(error.code).toBe("AUTH_RATE_LIMIT_EXCEEDED");

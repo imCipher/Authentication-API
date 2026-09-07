@@ -53,7 +53,7 @@ describe("Token Utilities", () => {
         } catch (error) {
           expect(error.statusCode).toBe(401);
           expect(error.code).toBe("TOKEN_EXPIRED");
-          expect(error.message).toBe("Access token expired.");
+          expect(error.message).toBe("Access token expired");
         }
       } finally {
         // Always restore real timers so subsequent tests are not affected

@@ -116,7 +116,7 @@ describe("catchAsync Utility", () => {
     });
   });
 
-  describe("Express Pipeline Context & Real-world Simulation", () => {
+    describe("Express Pipeline Context & Real-world Simulation", () => {
     it("should intercept service errors and halt normal response sending", async () => {
       const authError = ApiError.unauthorized("Token expired");
       const mockAuthService = {
@@ -133,14 +133,17 @@ describe("catchAsync Utility", () => {
       const wrapped = catchAsync(controller);
       wrapped(req, res, next);
 
-      await Promise.resolve();
+      // Wait for the full async resolution chain to finish and invoke next()
+      await vi.waitFor(() => {
+        expect(next).toHaveBeenCalledWith(authError);
+      });
 
       expect(mockAuthService.validateSession).toHaveBeenCalledWith(
         "Bearer expired-token",
       );
-      expect(next).toHaveBeenCalledWith(authError);
       expect(res.status).not.toHaveBeenCalled();
       expect(res.json).not.toHaveBeenCalled();
     });
   });
+
 });

@@ -76,11 +76,11 @@ describe("Admin Validation Schemas", () => {
 
       expect(invalidRole.success).toBe(false);
       expect(invalidRole.error.issues[0].message).toBe(
-        "Role must be either 'USER' or 'ADMIN'",
+        'Invalid option: expected one of "USER"|"ADMIN"',
       );
       expect(invalidStatus.success).toBe(false);
       expect(invalidStatus.error.issues[0].message).toBe(
-        "Status must be 'ACTIVE', 'SUSPENDED', or 'DEACTIVATED'",
+        'Invalid option: expected one of "ACTIVE"|"SUSPENDED"|"DEACTIVATED"',
       );
     });
 

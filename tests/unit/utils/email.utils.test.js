@@ -5,7 +5,9 @@ import Email from "../../../src/utils/email.utils.js";
 import finalConfig from "../../../src/config/keys.js";
 
 // Mock Nodemailer transport to isolate network I/O
-const mockSendMail = vi.fn().mockResolvedValue({ messageId: "mock-message-id-123" });
+const mockSendMail = vi
+  .fn()
+  .mockResolvedValue({ messageId: "mock-message-id-123" });
 const mockCreateTransport = vi.fn().mockReturnValue({
   sendMail: mockSendMail,
 });
@@ -138,10 +140,7 @@ describe("Email Utility", () => {
 
       await email.sendWelcomeEmail();
 
-      expect(sendSpy).toHaveBeenCalledWith(
-        "welcome",
-        "Welcome to Test Auth!",
-      );
+      expect(sendSpy).toHaveBeenCalledWith("welcome", "Welcome to Test Auth!");
       sendSpy.mockRestore();
     });
 

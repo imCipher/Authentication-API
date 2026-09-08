@@ -21,7 +21,7 @@ describe("ApiError", () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(ApiError);
-      expect(error.name).toBe("Error");
+      expect(error.name).toBe("ApiError");
       expect(error.message).toBe("Something went wrong");
     });
 

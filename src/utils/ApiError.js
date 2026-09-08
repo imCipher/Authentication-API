@@ -26,6 +26,8 @@ class ApiError extends Error {
   constructor(message, statusCode, errors = undefined, options = {}) {
     super(message, options); // Error natively reads options.cause
 
+    this.name = this.constructor.name;
+
     this.statusCode = statusCode;
     this.status = `${statusCode}`.startsWith("4") ? "fail" : "error";
     this.isOperational = true;

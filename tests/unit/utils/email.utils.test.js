@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import nodemailer from "nodemailer";
 import pug from "pug";
 import Email from "../../../src/utils/email.utils.js";

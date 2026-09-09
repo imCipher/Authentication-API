@@ -1,4 +1,3 @@
-// import { describe, it, expect } from "vitest";
 import hashUtils from "../../../src/utils/hash.utils";
 
 describe("Hash Utilities", () => {

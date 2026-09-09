@@ -85,6 +85,8 @@ describe("Admin Validation Schemas", () => {
     });
 
     it("should reject search query exceeding 100 characters", () => {
+
+      // Generate a string of 101 characters
       const result = adminValidation.getUsersSchema.query.safeParse({
         search: "a".repeat(101),
       });

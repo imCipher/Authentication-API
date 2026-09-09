@@ -23,6 +23,7 @@ describe("Email Utility", () => {
     fullName: "Johnathan Doe",
   };
 
+  // Clear mocks and set default mock behavior before each test
   beforeEach(() => {
     vi.clearAllMocks();
     mockSendMail.mockResolvedValue({ messageId: "mock-message-id-123" });
@@ -78,6 +79,7 @@ describe("Email Utility", () => {
 
   describe("Email Template Rendering & Dispatch (send)", () => {
     it("should render the pug template with correct locals and pass mailOptions to sendMail", async () => {
+      // Spy on pug.renderFile to verify template rendering
       const renderSpy = vi.spyOn(pug, "renderFile");
       const email = new Email(mockUser, "123456");
 
@@ -169,6 +171,7 @@ describe("Email Utility", () => {
       async (template, subject, code, urlCode) => {
         const email = new Email(mockUser, code);
 
+        // Ensure that the send method does not throw and that sendMail is called with expected parameters
         await expect(
           email.send(template, subject, urlCode),
         ).resolves.not.toThrow();

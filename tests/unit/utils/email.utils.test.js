@@ -1,4 +1,3 @@
-import nodemailer from "nodemailer";
 import pug from "pug";
 import Email from "../../../src/utils/email.utils.js";
 import finalConfig from "../../../src/config/keys.js";

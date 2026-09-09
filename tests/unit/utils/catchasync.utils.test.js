@@ -6,6 +6,7 @@ describe("catchAsync Utility", () => {
   let res;
   let next;
 
+  // Reset mocks and initialize request/response objects before each test
   beforeEach(() => {
     req = {
       body: {},
@@ -94,6 +95,7 @@ describe("catchAsync Utility", () => {
       const wrapped = catchAsync(handler);
       wrapped(req, res, next);
 
+      // Allow the promise rejection to propagate to .catch(next)
       await Promise.resolve();
 
       expect(next).toHaveBeenCalledTimes(1);
@@ -109,6 +111,7 @@ describe("catchAsync Utility", () => {
       const wrapped = catchAsync(handler);
       wrapped(req, res, next);
 
+      // Allow the promise rejection to propagate to .catch(next)
       await Promise.resolve();
 
       expect(next).toHaveBeenCalledTimes(1);

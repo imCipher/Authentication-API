@@ -137,7 +137,7 @@ describe("Validator Middleware (validateRequest)", () => {
       expect(error.errors).toEqual([
         {
           field: "username",
-          message: "Username too short",
+          message: "Username too short", // Ensuring the error message matches the schema's custom message
         },
       ]);
     });
@@ -161,7 +161,7 @@ describe("Validator Middleware (validateRequest)", () => {
       expect(error.errors).toEqual([
         {
           field: "user.profile.age",
-          message: "Must be at least 18",
+          message: "Must be at least 18", 
         },
       ]);
     });
@@ -174,7 +174,7 @@ describe("Validator Middleware (validateRequest)", () => {
             confirmPassword: z.string(),
           })
           .refine(data => data.password === data.confirmPassword, {
-            message: "Passwords do not match",
+            message: "Passwords do not match", 
           }),
       };
 

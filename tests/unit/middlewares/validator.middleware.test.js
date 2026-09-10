@@ -82,7 +82,7 @@ describe("Validator Middleware (validateRequest)", () => {
     it("should validate route params and attach to req.validated.params", () => {
       const schema = {
         params: z.object({
-          id: z.string().uuid(),
+          id: z.string().pipe(z.uuid()),
         }),
       };
 

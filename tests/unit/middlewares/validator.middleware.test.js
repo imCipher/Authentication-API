@@ -48,7 +48,7 @@ describe("Validator Middleware (validateRequest)", () => {
     it("should validate and attach parsed body to req.validated.body", () => {
       const schema = {
         body: z.object({
-          email: z.string().email(),
+          email: z.string().pipe(z.email()),
           count: z.coerce.number(),
         }),
       };
@@ -191,7 +191,7 @@ describe("Validator Middleware (validateRequest)", () => {
     it("should aggregate multiple validation errors into the errors array", () => {
       const schema = {
         body: z.object({
-          email: z.string().email("Invalid email"),
+          email: z.string().pipe(z.email()),
           password: z.string().min(8, "Password too short"),
         }),
       };

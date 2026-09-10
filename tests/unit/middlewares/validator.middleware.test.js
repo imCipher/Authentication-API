@@ -7,6 +7,7 @@ describe("Validator Middleware (validateRequest)", () => {
   let res;
   let next;
 
+  // Mocking req, res, and next for each test to ensure isolation and prevent state leakage between tests
   beforeEach(() => {
     req = {
       body: {},
@@ -30,6 +31,8 @@ describe("Validator Middleware (validateRequest)", () => {
 
     it("should preserve pre-existing req.validated properties when merging results", () => {
       req.validated = { existingMetadata: "token-123" };
+
+      // Middleware with a simple query schema
       const middleware = validateRequest({
         query: z.object({ page: z.string().default("1") }),
       });

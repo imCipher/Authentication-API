@@ -300,6 +300,7 @@ class AuthService {
         createdAt: true,
         expiresAt: true,
         revokedAt: true,
+        replacedBy: true,
         ipAddress: true,
         userAgent: true,
         graceToken: true,

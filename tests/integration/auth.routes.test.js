@@ -44,6 +44,8 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
   };
 
   beforeAll(async () => {
+    // Connect Redis for token denylist assertions
+    await redisService.connect();
     // Proactive cleanup: purge any orphaned test accounts from previously interrupted runs
     await prisma.user.deleteMany({
       where: {
@@ -81,7 +83,8 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       });
     }
 
-    // Disconnect Prisma client to release connection pool handles
+    // Disconnect clients to release connection handles
+    await redisService.disconnect();
     await prisma.$disconnect();
   });
 
@@ -478,7 +481,8 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
     // Helper to register and immediately verify a user for login tests
     const createVerifiedTestUser = async (suffix = "login") => {
       const userData = generateTestUser(suffix);
-      const mockToken = "123456";
+      // Generate a unique 6-digit code for every user to avoid DB unique constraint collisions
+      const mockToken = String(Math.floor(100000 + Math.random() * 900000));
       vi.spyOn(tokenUtils, "verificationToken").mockReturnValue(mockToken);
 
       const regRes = await request(app)

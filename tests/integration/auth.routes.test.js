@@ -9,11 +9,13 @@ import Email from "../../src/utils/email.utils.js";
 // Mock the Email utility so real SMTP network calls are never dispatched
 vi.mock("../../src/utils/email.utils.js", () => {
   return {
-    default: vi.fn().mockImplementation(() => ({
-      sendEmailConfirmation: vi.fn().mockResolvedValue(undefined),
-      sendWelcomeEmail: vi.fn().mockResolvedValue(undefined),
-      sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
-    })),
+    default: vi.fn().mockImplementation(function () {
+      return {
+        sendEmailConfirmation: vi.fn().mockResolvedValue(undefined),
+        sendWelcomeEmail: vi.fn().mockResolvedValue(undefined),
+        sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
+      };
+    }),
   };
 });
 
@@ -38,6 +40,18 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       confirmPassword: password,
     };
   };
+
+  beforeAll(async () => {
+    // Proactive cleanup: purge any orphaned test accounts from previously interrupted runs
+    await prisma.user.deleteMany({
+      where: {
+        OR: [
+          { email: { startsWith: "test_" } },
+          { username: { startsWith: "usr_" } },
+        ],
+      },
+    });
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -119,7 +133,9 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       expect(dbVerification).not.toBeNull();
       expect(dbVerification.tokenHash).toBe(expectedTokenHash);
       expect(dbVerification.usedAt).toBeNull();
-      expect(new Date(dbVerification.expiresAt).getTime()).toBeGreaterThan(Date.now());
+      expect(new Date(dbVerification.expiresAt).getTime()).toBeGreaterThan(
+        Date.now(),
+      );
 
       // 4. Assert Asynchronous Confirmation Email Dispatched
       expect(Email).toHaveBeenCalledTimes(1);
@@ -127,7 +143,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
 
     it("should reject registration with 409 Conflict when username is already taken", async () => {
       const existingUser = generateTestUser("dupusr");
-      
+
       // Seed first user
       const firstRes = await request(app)
         .post("/api/v1/auth/register")
@@ -153,7 +169,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
 
     it("should reject registration with 409 Conflict when email is already registered", async () => {
       const existingUser = generateTestUser("dupeml");
-      
+
       // Seed first user
       const firstRes = await request(app)
         .post("/api/v1/auth/register")

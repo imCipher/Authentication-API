@@ -11,8 +11,11 @@ process.env.JWT_REFRESH_EXPIRES_IN = "7";
 process.env.JWT_REFRESH_GRACE_WINDOW_SECONDS = "30";
 process.env.EMAIL_USER = "test@example.com";
 process.env.EMAIL_PASS = "testpassword";
+
+// Allow DATABASE_URL from .env or fallback to local Auth_db
 process.env.DATABASE_URL =
-  "postgresql://postgres:password@localhost:5432/test_db";
+  process.env.DATABASE_URL ||
+  "postgresql://postgres:admin@localhost:5432/Auth_db?schema=public";
 
 // Suppress noisy logs during test runs
 vi.mock("../src/config/logger.js", () => ({

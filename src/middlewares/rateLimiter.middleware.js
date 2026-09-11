@@ -50,7 +50,7 @@ const createRateLimiterWithFallback = ({
       if (req.user && req.user.id) {
         return `user:${req.user.id}`;
       }
-      return ipKeyGenerator(req);
+      return ipKeyGenerator(req.ip);
     },
 
     handler: (req, res, next) => {

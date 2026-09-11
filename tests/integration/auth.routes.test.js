@@ -1,13 +1,4 @@
 import request from "supertest";
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  afterAll,
-  vi,
-} from "vitest";
 
 import app from "../../src/app.js";
 import prisma from "../../src/config/db.js";
@@ -15,7 +6,7 @@ import finalConfig from "../../src/config/keys.js";
 import tokenUtils from "../../src/utils/token.utils.js";
 import Email from "../../src/utils/email.utils.js";
 
-// Mock the Email utility so real SMTP network calls are never sent
+// Mock the Email utility so real SMTP network calls are never dispatched
 vi.mock("../../src/utils/email.utils.js", () => {
   return {
     default: vi.fn().mockImplementation(() => ({
@@ -30,14 +21,19 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
   const testUserIds = new Set();
   let originalEnv;
 
-  // Helper function to generate unique credentials for test isolation
+  // Helper function to generate unique credentials adhering strictly to Zod schemas
   const generateTestUser = (suffix = "") => {
-    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}${suffix}`;
+    const randomPart = Math.random().toString(36).substring(2, 8);
+    const timestamp = Date.now().toString().slice(-6);
+    const cleanSuffix = suffix.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    const uniqueSuffix = `${timestamp}${randomPart}${cleanSuffix}`;
     const password = "StrongP@ssw0rd123!";
+
     return {
-      fullName: `Integration User ${uniqueId}`,
-      username: `user_${uniqueId}`.substring(0, 30), // Database limit max 30 chars
-      email: `test_auth_${uniqueId}@example.com`,
+      // fullName ONLY allows letters, spaces, hyphens, and apostrophes (NO digits or underscores)
+      fullName: "Integration Test User",
+      username: `usr_${uniqueSuffix}`.substring(0, 30),
+      email: `test_${uniqueSuffix}@example.com`,
       password,
       confirmPassword: password,
     };
@@ -123,17 +119,15 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       expect(dbVerification).not.toBeNull();
       expect(dbVerification.tokenHash).toBe(expectedTokenHash);
       expect(dbVerification.usedAt).toBeNull();
-      expect(new Date(dbVerification.expiresAt).getTime()).toBeGreaterThan(
-        Date.now(),
-      );
+      expect(new Date(dbVerification.expiresAt).getTime()).toBeGreaterThan(Date.now());
 
       // 4. Assert Asynchronous Confirmation Email Dispatched
       expect(Email).toHaveBeenCalledTimes(1);
     });
 
     it("should reject registration with 409 Conflict when username is already taken", async () => {
-      const existingUser = generateTestUser("_dup_user");
-
+      const existingUser = generateTestUser("dupusr");
+      
       // Seed first user
       const firstRes = await request(app)
         .post("/api/v1/auth/register")
@@ -143,7 +137,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
 
       // Attempt second registration with same username but different email
       const conflictingPayload = {
-        ...generateTestUser("_different_email"),
+        ...generateTestUser("diffemail"),
         username: existingUser.username,
       };
 
@@ -158,8 +152,8 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
     });
 
     it("should reject registration with 409 Conflict when email is already registered", async () => {
-      const existingUser = generateTestUser("_dup_email");
-
+      const existingUser = generateTestUser("dupeml");
+      
       // Seed first user
       const firstRes = await request(app)
         .post("/api/v1/auth/register")
@@ -169,7 +163,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
 
       // Attempt second registration with same email but different username
       const conflictingPayload = {
-        ...generateTestUser("_different_user"),
+        ...generateTestUser("diffusr"),
         email: existingUser.email,
       };
 
@@ -209,7 +203,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
   // =========================================================================
   describe("POST /api/v1/auth/verify-email", () => {
     it("should successfully verify email with 200 OK, update user record, and mark token as used", async () => {
-      const userData = generateTestUser("_verify_ok");
+      const userData = generateTestUser("verok");
       const validToken = "112233";
       vi.spyOn(tokenUtils, "verificationToken").mockReturnValue(validToken);
 
@@ -217,6 +211,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       const regRes = await request(app)
         .post("/api/v1/auth/register")
         .send(userData);
+      expect(regRes.status).toBe(201);
       const userId = regRes.body.data.user.id;
       testUserIds.add(userId);
 
@@ -262,7 +257,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
     });
 
     it("should reject with 400 Bad Request when the token has expired", async () => {
-      const userData = generateTestUser("_expired_token");
+      const userData = generateTestUser("exptkn");
       const expiredToken = "445566";
       vi.spyOn(tokenUtils, "verificationToken").mockReturnValue(expiredToken);
 
@@ -270,6 +265,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       const regRes = await request(app)
         .post("/api/v1/auth/register")
         .send(userData);
+      expect(regRes.status).toBe(201);
       const userId = regRes.body.data.user.id;
       testUserIds.add(userId);
 
@@ -295,7 +291,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
     });
 
     it("should reject with 400 Bad Request when attempting to reuse an already claimed token (Replay Protection)", async () => {
-      const userData = generateTestUser("_replay_protection");
+      const userData = generateTestUser("rply");
       const singleUseToken = "778899";
       vi.spyOn(tokenUtils, "verificationToken").mockReturnValue(singleUseToken);
 
@@ -303,6 +299,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       const regRes = await request(app)
         .post("/api/v1/auth/register")
         .send(userData);
+      expect(regRes.status).toBe(201);
       const userId = regRes.body.data.user.id;
       testUserIds.add(userId);
 
@@ -339,7 +336,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
   // =========================================================================
   describe("POST /api/v1/auth/resend-verification", () => {
     it("should successfully issue a new verification token for an unverified user", async () => {
-      const userData = generateTestUser("_resend_ok");
+      const userData = generateTestUser("rsndok");
       const initialToken = "111222";
       const newToken = "333444";
 
@@ -348,6 +345,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       const regRes = await request(app)
         .post("/api/v1/auth/register")
         .send(userData);
+      expect(regRes.status).toBe(201);
       const userId = regRes.body.data.user.id;
       testUserIds.add(userId);
 
@@ -381,7 +379,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
     });
 
     it("should return 200 OK silently without creating new tokens when user is already verified (Anti-Enumeration)", async () => {
-      const userData = generateTestUser("_already_verified");
+      const userData = generateTestUser("alrver");
       const token = "555666";
       vi.spyOn(tokenUtils, "verificationToken").mockReturnValue(token);
 
@@ -389,10 +387,14 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       const regRes = await request(app)
         .post("/api/v1/auth/register")
         .send(userData);
+      expect(regRes.status).toBe(201);
       const userId = regRes.body.data.user.id;
       testUserIds.add(userId);
 
-      await request(app).post("/api/v1/auth/verify-email").send({ token });
+      const verifyRes = await request(app)
+        .post("/api/v1/auth/verify-email")
+        .send({ token });
+      expect(verifyRes.status).toBe(200);
 
       // Request resend for already-verified email
       const response = await request(app)

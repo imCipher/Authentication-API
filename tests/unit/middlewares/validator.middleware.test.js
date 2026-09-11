@@ -161,7 +161,7 @@ describe("Validator Middleware (validateRequest)", () => {
       expect(error.errors).toEqual([
         {
           field: "user.profile.age",
-          message: "Must be at least 18", 
+          message: "Must be at least 18",
         },
       ]);
     });
@@ -174,7 +174,7 @@ describe("Validator Middleware (validateRequest)", () => {
             confirmPassword: z.string(),
           })
           .refine(data => data.password === data.confirmPassword, {
-            message: "Passwords do not match", 
+            message: "Passwords do not match",
           }),
       };
 
@@ -206,7 +206,7 @@ describe("Validator Middleware (validateRequest)", () => {
       const error = next.mock.calls[0][0];
       expect(error.errors).toHaveLength(2);
       expect(error.errors).toEqual([
-        { field: "email", message: "Invalid email" },
+        { field: "email", message: "Invalid email address" },
         { field: "password", message: "Password too short" },
       ]);
     });

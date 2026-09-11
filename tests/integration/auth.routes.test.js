@@ -446,7 +446,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       // Temporarily enable production mode to activate rate limiters
       finalConfig.env = "production";
 
-      const testIp = "203.0.113.195"; // Dedicated IP address to prevent collision
+      const testIp = `203.0.113.${Math.floor(1 + Math.random() * 250)}`; // Dynamic IP prevents Redis TTL collisions across runs
       const targetEmail = "ratelimit_test@example.com";
 
       // The emailVerificationRateLimiter is configured with max: 3

@@ -1055,7 +1055,7 @@ class AuthService {
         await tx.user.update({
           where: { id: userId },
           data: {
-            sessionRevokedAt: new Date(),
+            sessionsRevokedAt: new Date(),
           },
         });
 

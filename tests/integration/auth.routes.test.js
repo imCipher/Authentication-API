@@ -15,12 +15,16 @@ vi.mock("../../src/utils/email.utils.js", () => {
       return {
         sendEmailConfirmation: vi.fn().mockResolvedValue(undefined),
         sendWelcomeEmail: vi.fn().mockResolvedValue(undefined),
+        sendPasswordReset: vi.fn().mockResolvedValue(undefined),
         sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
       };
     }),
   };
 });
 
+// =========================================================================
+// 1. Registration & Verification Lifecycle
+// =========================================================================
 describe("Auth Routes Integration - Registration & Verification Lifecycle", () => {
   const testUserIds = new Set();
   let originalEnv;
@@ -475,7 +479,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
   });
 
   // =========================================================================
-  // 4. LOGIN, LOCKOUT & TOKEN MANAGEMENT
+  // 2. LOGIN, LOCKOUT & TOKEN MANAGEMENT
   // =========================================================================
   describe("Auth Routes Integration - Login, Lockout & Token Management", () => {
     // Helper to register and immediately verify a user for login tests
@@ -939,6 +943,592 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
         expect(deviceBRes.body.error.message).toContain(
           "You have logged out from all sessions. Please log in again.",
         );
+      });
+    });
+  });
+
+  // =========================================================================
+  // PART 3: PASSWORD MANAGEMENT & PROFILE LIFECYCLE
+  // =========================================================================
+  describe("Auth Routes Integration - Password Management & Profile", () => {
+    // Helper to register and immediately verify a user for login tests
+    const createVerifiedTestUser = async (suffix = "login") => {
+      const userData = generateTestUser(suffix);
+      // Generate a unique 6-digit code for every user to avoid DB unique constraint collisions
+      const mockToken = String(Math.floor(100000 + Math.random() * 900000));
+      vi.spyOn(tokenUtils, "verificationToken").mockReturnValue(mockToken);
+
+      const regRes = await request(app)
+        .post("/api/v1/auth/register")
+        .send(userData);
+      expect(regRes.status).toBe(201);
+      const userId = regRes.body.data.user.id;
+      testUserIds.add(userId);
+
+      // Verify the user email so they can log in
+      const verifyRes = await request(app)
+        .post("/api/v1/auth/verify-email")
+        .send({ token: mockToken });
+      expect(verifyRes.status).toBe(200);
+
+      return { ...userData, id: userId };
+    };
+
+    // -----------------------------------------------------------------------
+    // POST /api/v1/auth/forgot-password
+    // -----------------------------------------------------------------------
+    describe("POST /api/v1/auth/forgot-password", () => {
+      it("should return 200 OK and persist a PasswordReset record for a registered user", async () => {
+        const user = await createVerifiedTestUser("forgot_valid");
+
+        const response = await request(app)
+          .post("/api/v1/auth/forgot-password")
+          .send({ email: user.email });
+
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+        expect(response.body.message).toContain(
+          "Password reset email sent successfully",
+        );
+
+        // Assert database state: PasswordReset row exists and is unused
+        const resetRecord = await prisma.passwordReset.findFirst({
+          where: { userId: user.id },
+        });
+        expect(resetRecord).not.toBeNull();
+        expect(resetRecord.usedAt).toBeNull();
+        expect(resetRecord.expiresAt.getTime()).toBeGreaterThan(Date.now());
+      });
+
+      it("should return 200 OK silently when email does not exist (Anti-Enumeration Protection)", async () => {
+        const fakeEmail = "non_existent_forgot_password@example.com";
+
+        const response = await request(app)
+          .post("/api/v1/auth/forgot-password")
+          .send({ email: fakeEmail });
+
+        // Indistinguishable response from a valid email to prevent user enumeration
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+        expect(response.body.message).toContain(
+          "Password reset email sent successfully",
+        );
+
+        // Assert database state: No reset record created
+        const resetRecord = await prisma.passwordReset.findFirst({
+          where: { user: { email: fakeEmail } },
+        });
+        expect(resetRecord).toBeNull();
+      });
+
+      it("should purge previous reset records and replace with a fresh one on consecutive requests", async () => {
+        const user = await createVerifiedTestUser("forgot_replace");
+
+        // First forgot-password request
+        await request(app)
+          .post("/api/v1/auth/forgot-password")
+          .send({ email: user.email });
+
+        const firstRecord = await prisma.passwordReset.findFirst({
+          where: { userId: user.id },
+        });
+
+        // Second forgot-password request
+        await request(app)
+          .post("/api/v1/auth/forgot-password")
+          .send({ email: user.email });
+
+        const secondRecords = await prisma.passwordReset.findMany({
+          where: { userId: user.id },
+        });
+
+        // Only 1 record should exist, and its ID must be newer
+        expect(secondRecords).toHaveLength(1);
+        expect(secondRecords[0].id).not.toBe(firstRecord.id);
+      });
+
+      it("should return 400 Bad Request when email format is invalid", async () => {
+        const response = await request(app)
+          .post("/api/v1/auth/forgot-password")
+          .send({ email: "invalid-email-format" });
+
+        expect(response.status).toBe(400);
+        expect(response.body.success).toBe(false);
+        expect(response.body.error.code).toBe("VALIDATION_ERROR");
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // POST /api/v1/auth/reset-password/:token
+    // -----------------------------------------------------------------------
+    describe("POST /api/v1/auth/reset-password/:token", () => {
+      it("should reset password with valid one-time token, update passwordChangedAt, and invalidate active sessions (200 OK)", async () => {
+        const user = await createVerifiedTestUser("reset_success");
+
+        // 1. Establish an active session before password reset
+        const loginRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
+        const oldAccessToken = loginRes.body.data.tokens.accessToken;
+        const oldRefreshToken = loginRes.body.data.tokens.refreshToken;
+
+        // 2. Generate a known deterministic reset token
+        const mockResetToken = "a1b2c3d4e5f607182930415263748596a1b2c3d4";
+        vi.spyOn(tokenUtils, "secureToken").mockReturnValue(mockResetToken);
+
+        await request(app)
+          .post("/api/v1/auth/forgot-password")
+          .send({ email: user.email });
+
+        // 3. Reset password using the token
+        const newPassword = "BrandNewSecureP@ssw0rd99!";
+        const resetRes = await request(app)
+          .post(`/api/v1/auth/reset-password/${mockResetToken}`)
+          .send({
+            newPassword,
+            confirmNewPassword: newPassword,
+          });
+
+        expect(resetRes.status).toBe(200);
+        expect(resetRes.body.success).toBe(true);
+        expect(resetRes.body.message).toContain("Password reset successfully");
+
+        // 4. Assert Database transitions
+        const updatedUser = await prisma.user.findUnique({
+          where: { id: user.id },
+        });
+        expect(updatedUser.passwordChangedAt).not.toBeNull();
+
+        const usedResetRecord = await prisma.passwordReset.findFirst({
+          where: { userId: user.id },
+        });
+        expect(usedResetRecord.usedAt).not.toBeNull();
+
+        // Refresh token revoked in DB
+        const revokedToken = await prisma.refreshToken.findFirst({
+          where: { tokenHash: tokenUtils.hashToken(oldRefreshToken) },
+        });
+        expect(revokedToken.revokedAt).not.toBeNull();
+
+        // AuditLog entry persisted
+        const audit = await prisma.auditLog.findFirst({
+          where: { userId: user.id, action: "PASSWORD_RESET" },
+        });
+        expect(audit).not.toBeNull();
+
+        // 5. Invalidation consequence: Old access token must be rejected by protect middleware
+        const meRes = await request(app)
+          .get("/api/v1/auth/me")
+          .set("Authorization", `Bearer ${oldAccessToken}`);
+        expect(meRes.status).toBe(401);
+        expect(meRes.body.error.message).toContain(
+          "You have recently changed your password",
+        );
+
+        // 6. Verification: Login with old password fails, new password succeeds
+        const oldLogin = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
+        expect(oldLogin.status).toBe(401);
+
+        const newLogin = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: newPassword });
+        expect(newLogin.status).toBe(200);
+      });
+
+      it("should reject replay attempts using an already consumed reset token (400 Bad Request)", async () => {
+        const user = await createVerifiedTestUser("reset_replay");
+
+        const mockResetToken = "b1b2c3d4e5f607182930415263748596b1b2c3d4";
+        vi.spyOn(tokenUtils, "secureToken").mockReturnValue(mockResetToken);
+
+        await request(app)
+          .post("/api/v1/auth/forgot-password")
+          .send({ email: user.email });
+
+        const newPassword = "BrandNewSecureP@ssw0rd99!";
+
+        // First consumption: Success
+        const firstRes = await request(app)
+          .post(`/api/v1/auth/reset-password/${mockResetToken}`)
+          .send({ newPassword, confirmNewPassword: newPassword });
+        expect(firstRes.status).toBe(200);
+
+        // Replay attempt: Rejected
+        const replayRes = await request(app)
+          .post(`/api/v1/auth/reset-password/${mockResetToken}`)
+          .send({ newPassword, confirmNewPassword: newPassword });
+        expect(replayRes.status).toBe(400);
+        expect(replayRes.body.error.code).toBe("TOKEN_INVALID");
+      });
+
+      it("should reject expired reset token with 400 Bad Request", async () => {
+        const user = await createVerifiedTestUser("reset_expired");
+
+        const mockResetToken = "c1b2c3d4e5f607182930415263748596c1b2c3d4";
+        vi.spyOn(tokenUtils, "secureToken").mockReturnValue(mockResetToken);
+
+        await request(app)
+          .post("/api/v1/auth/forgot-password")
+          .send({ email: user.email });
+
+        // Backdate expiresAt in DB to 10 minutes ago
+        await prisma.passwordReset.updateMany({
+          where: { userId: user.id },
+          data: { expiresAt: new Date(Date.now() - 1000 * 60 * 10) },
+        });
+
+        const response = await request(app)
+          .post(`/api/v1/auth/reset-password/${mockResetToken}`)
+          .send({
+            newPassword: "BrandNewSecureP@ssw0rd99!",
+            confirmNewPassword: "BrandNewSecureP@ssw0rd99!",
+          });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error.code).toBe("TOKEN_INVALID");
+      });
+
+      it("should reject when newPassword and confirmNewPassword mismatch (400 Bad Request)", async () => {
+        const response = await request(app)
+          .post("/api/v1/auth/reset-password/sometoken12345678")
+          .send({
+            newPassword: "SecurePassword1!",
+            confirmNewPassword: "DifferentPassword2!",
+          });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error.code).toBe("VALIDATION_ERROR");
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // GET /api/v1/auth/me
+    // -----------------------------------------------------------------------
+    describe("GET /api/v1/auth/me", () => {
+      it("should return the authenticated user's profile and strip sensitive fields (200 OK)", async () => {
+        const user = await createVerifiedTestUser("me_profile");
+
+        const loginRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
+        const { accessToken } = loginRes.body.data.tokens;
+
+        const response = await request(app)
+          .get("/api/v1/auth/me")
+          .set("Authorization", `Bearer ${accessToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+
+        const returnedUser = response.body.data.user;
+        expect(returnedUser.id).toBe(user.id);
+        expect(returnedUser.email).toBe(user.email);
+        expect(returnedUser.username).toBe(user.username);
+        expect(returnedUser.fullName).toBe(user.fullName);
+        expect(returnedUser.emailVerified).toBe(true);
+
+        // Security check: Sensitive attributes must never leak in response body
+        expect(returnedUser.passwordHash).toBeUndefined();
+        expect(returnedUser.passwordChangedAt).toBeUndefined();
+        expect(returnedUser.sessionsRevokedAt).toBeUndefined();
+      });
+
+      it("should reject unauthenticated request with 401 Unauthorized", async () => {
+        const response = await request(app).get("/api/v1/auth/me");
+
+        expect(response.status).toBe(401);
+        expect(response.body.error.code).toBe("UNAUTHORIZED");
+      });
+
+      it("should reject malformed or invalid token with 401 Unauthorized", async () => {
+        const response = await request(app)
+          .get("/api/v1/auth/me")
+          .set("Authorization", "Bearer this.is.invalid.jwt");
+
+        expect(response.status).toBe(401);
+        expect(response.body.error.code).toBe("TOKEN_INVALID");
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // PATCH /api/v1/auth/me
+    // -----------------------------------------------------------------------
+    describe("PATCH /api/v1/auth/me", () => {
+      it("should update non-sensitive profile field (fullName) without disrupting verification status (200 OK)", async () => {
+        const user = await createVerifiedTestUser("patch_name");
+
+        const loginRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
+        const { accessToken } = loginRes.body.data.tokens;
+
+        const updatedName = "Jane Doe Updated";
+        const response = await request(app)
+          .patch("/api/v1/auth/me")
+          .set("Authorization", `Bearer ${accessToken}`)
+          .send({ fullName: updatedName });
+
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+        expect(response.body.data.user.fullName).toBe(updatedName);
+
+        // Database verification: Name changed, verification remains true
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id },
+        });
+        expect(dbUser.fullName).toBe(updatedName);
+        expect(dbUser.emailVerified).toBe(true);
+      });
+
+      it("should handle email change by marking email unverified and revoking existing sessions", async () => {
+        const user = await createVerifiedTestUser("patch_email");
+
+        const loginRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
+        const { accessToken } = loginRes.body.data.tokens;
+
+        const newEmail = `updated_${Date.now()}@example.com`;
+        const response = await request(app)
+          .patch("/api/v1/auth/me")
+          .set("Authorization", `Bearer ${accessToken}`)
+          .send({ email: newEmail });
+
+        expect(response.status).toBe(200);
+        expect(response.body.data.user.email).toBe(newEmail);
+        expect(response.body.data.user.emailVerified).toBe(false);
+
+        // Database assertions: Email unverified, sessionsRevokedAt set, AuditLog recorded
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id },
+        });
+        expect(dbUser.email).toBe(newEmail);
+        expect(dbUser.emailVerified).toBe(false);
+        expect(dbUser.sessionsRevokedAt).not.toBeNull();
+
+        const audit = await prisma.auditLog.findFirst({
+          where: { userId: user.id, action: "EMAIL_CHANGE" },
+        });
+        expect(audit).not.toBeNull();
+
+        // Access token issued prior to email update must now be rejected
+        const meRes = await request(app)
+          .get("/api/v1/auth/me")
+          .set("Authorization", `Bearer ${accessToken}`);
+        expect(meRes.status).toBe(401);
+        expect(meRes.body.error.message).toContain(
+          "You have logged out from all sessions",
+        );
+      });
+
+      it("should reject with 409 Conflict when attempting to take another user's username", async () => {
+        const userA = await createVerifiedTestUser("patch_ua");
+        const userB = await createVerifiedTestUser("patch_ub");
+
+        const loginRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: userA.email, password: userA.password });
+        const { accessToken } = loginRes.body.data.tokens;
+
+        // User A attempts to claim User B's username
+        const response = await request(app)
+          .patch("/api/v1/auth/me")
+          .set("Authorization", `Bearer ${accessToken}`)
+          .send({ username: userB.username });
+
+        expect(response.status).toBe(409);
+        expect(response.body.error.message).toContain(
+          "Username is already taken",
+        );
+      });
+
+      it("should reject with 409 Conflict when attempting to take another user's email", async () => {
+        const userA = await createVerifiedTestUser("patch_ea");
+        const userB = await createVerifiedTestUser("patch_eb");
+
+        const loginRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: userA.email, password: userA.password });
+        const { accessToken } = loginRes.body.data.tokens;
+
+        // User A attempts to claim User B's email
+        const response = await request(app)
+          .patch("/api/v1/auth/me")
+          .set("Authorization", `Bearer ${accessToken}`)
+          .send({ email: userB.email });
+
+        expect(response.status).toBe(409);
+        expect(response.body.error.message).toContain(
+          "Email is already registered by another user",
+        );
+      });
+
+      it("should reject with 400 Bad Request when request body has no fields to update", async () => {
+        const user = await createVerifiedTestUser("patch_empty");
+
+        const loginRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
+        const { accessToken } = loginRes.body.data.tokens;
+
+        const response = await request(app)
+          .patch("/api/v1/auth/me")
+          .set("Authorization", `Bearer ${accessToken}`)
+          .send({});
+
+        expect(response.status).toBe(400);
+        expect(response.body.error.code).toBe("VALIDATION_ERROR");
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // POST /api/v1/auth/change-password
+    // -----------------------------------------------------------------------
+    describe("POST /api/v1/auth/change-password", () => {
+      it("should update password, revoke all refresh tokens, update passwordChangedAt, and invalidate active sessions (200 OK)", async () => {
+        const user = await createVerifiedTestUser("pwd_change_ok");
+
+        // 1. Establish session
+        const loginRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
+        const oldAccessToken = loginRes.body.data.tokens.accessToken;
+        const oldRefreshToken = loginRes.body.data.tokens.refreshToken;
+
+        // 2. Change password
+        const newPassword = "BrandNewSecretP@ss123!";
+        const changeRes = await request(app)
+          .post("/api/v1/auth/change-password")
+          .set("Authorization", `Bearer ${oldAccessToken}`)
+          .send({
+            currentPassword: user.password,
+            newPassword,
+            confirmNewPassword: newPassword,
+          });
+
+        expect(changeRes.status).toBe(200);
+        expect(changeRes.body.success).toBe(true);
+        expect(changeRes.body.message).toContain(
+          "Password changed successfully",
+        );
+
+        // 3. Database state verifications
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id },
+        });
+        expect(dbUser.passwordChangedAt).not.toBeNull();
+
+        const revokedToken = await prisma.refreshToken.findFirst({
+          where: { tokenHash: tokenUtils.hashToken(oldRefreshToken) },
+        });
+        expect(revokedToken.revokedAt).not.toBeNull();
+
+        const audit = await prisma.auditLog.findFirst({
+          where: { userId: user.id, action: "PASSWORD_CHANGE" },
+        });
+        expect(audit).not.toBeNull();
+
+        // 4. Invalidation: Old access token is now rejected
+        const meRes = await request(app)
+          .get("/api/v1/auth/me")
+          .set("Authorization", `Bearer ${oldAccessToken}`);
+        expect(meRes.status).toBe(401);
+        expect(meRes.body.error.message).toContain(
+          "You have recently changed your password",
+        );
+
+        // 5. Authentication check: Old password rejected, new password accepted
+        const oldLogin = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
+        expect(oldLogin.status).toBe(401);
+
+        const newLogin = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: newPassword });
+        expect(newLogin.status).toBe(200);
+      });
+
+      it("should reject with 400 Bad Request when current password is incorrect", async () => {
+        const user = await createVerifiedTestUser("pwd_wrong_curr");
+
+        const loginRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
+        const { accessToken } = loginRes.body.data.tokens;
+
+        const response = await request(app)
+          .post("/api/v1/auth/change-password")
+          .set("Authorization", `Bearer ${accessToken}`)
+          .send({
+            currentPassword: "IncorrectCurrentPassword1!",
+            newPassword: "BrandNewSecretP@ss123!",
+            confirmNewPassword: "BrandNewSecretP@ss123!",
+          });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error.message).toContain(
+          "Current password is incorrect",
+        );
+      });
+
+      it("should reject with 400 Bad Request when new password is identical to current password", async () => {
+        const user = await createVerifiedTestUser("pwd_same");
+
+        const loginRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
+        const { accessToken } = loginRes.body.data.tokens;
+
+        const response = await request(app)
+          .post("/api/v1/auth/change-password")
+          .set("Authorization", `Bearer ${accessToken}`)
+          .send({
+            currentPassword: user.password,
+            newPassword: user.password,
+            confirmNewPassword: user.password,
+          });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error.message).toContain(
+          "New password cannot be the same as the current password",
+        );
+      });
+
+      it("should reject with 400 Bad Request when newPassword and confirmNewPassword mismatch", async () => {
+        const user = await createVerifiedTestUser("pwd_mismatch");
+
+        const loginRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
+        const { accessToken } = loginRes.body.data.tokens;
+
+        const response = await request(app)
+          .post("/api/v1/auth/change-password")
+          .set("Authorization", `Bearer ${accessToken}`)
+          .send({
+            currentPassword: user.password,
+            newPassword: "ValidNewP@ssword1!",
+            confirmNewPassword: "MismatchP@ssword2!",
+          });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error.code).toBe("VALIDATION_ERROR");
+      });
+
+      it("should reject with 401 Unauthorized when unauthenticated", async () => {
+        const response = await request(app)
+          .post("/api/v1/auth/change-password")
+          .send({
+            currentPassword: "SomeOldPassword1!",
+            newPassword: "SomeNewPassword1!",
+            confirmNewPassword: "SomeNewPassword1!",
+          });
+
+        expect(response.status).toBe(401);
+        expect(response.body.error.code).toBe("UNAUTHORIZED");
       });
     });
   });

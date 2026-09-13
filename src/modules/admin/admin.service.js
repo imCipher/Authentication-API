@@ -800,6 +800,120 @@ class AdminService {
       },
     };
   }
+
+  /**
+   * Triggers a database maintenance cleanup of expired, used, and stale records.
+   * Runs atomically inside a transaction to prevent database inconsistency.
+   *
+   * @param {Object} options - Cleanup options
+   * @param {number} [options.retentionDays=7] - Days to retain revoked/used tokens before deletion
+   * @param {boolean} [options.cleanLoginHistory=false] - Whether to purge old login history records
+   * @param {number} [options.loginHistoryRetentionDays=90] - Days to retain login history records
+   * @param {Object} context - Request metadata for audit logging
+   * @param {string} context.adminId - ID of the admin triggering the maintenance
+   * @param {string} [context.ip] - IP address of the admin
+   * @param {string} [context.userAgent] - User agent of the admin
+   * @returns {Promise<Object>} - Execution summary with per-table counts
+   */
+  async cleanupDatabase(
+    {
+      retentionDays = 7,
+      cleanLoginHistory = false,
+      loginHistoryRetentionDays = 90,
+    } = {},
+    { adminId, ip, userAgent } = {},
+  ) {
+    const now = new Date();
+    const tokenRetentionCutoff = new Date(
+      now.getTime() - retentionDays * 24 * 60 * 60 * 1000,
+    );
+    const loginHistoryCutoff = new Date(
+      now.getTime() - loginHistoryRetentionDays * 24 * 60 * 60 * 1000,
+    );
+
+    return await prisma.$transaction(async tx => {
+      // 1. Purge Refresh Tokens: Expired tokens OR revoked tokens past retention window
+      const deletedRefreshTokens = await tx.refreshToken.deleteMany({
+        where: {
+          OR: [
+            { expiresAt: { lt: now } },
+            { revokedAt: { lt: tokenRetentionCutoff } },
+          ],
+        },
+      });
+
+      // 2. Purge Email Verifications: Expired tokens OR used tokens past retention window
+      const deletedEmailVerifications = await tx.emailVerification.deleteMany({
+        where: {
+          OR: [
+            { expiresAt: { lt: now } },
+            { usedAt: { lt: tokenRetentionCutoff } },
+          ],
+        },
+      });
+
+      // 3. Purge Password Resets: Expired tokens OR used tokens past retention window
+      const deletedPasswordResets = await tx.passwordReset.deleteMany({
+        where: {
+          OR: [
+            { expiresAt: { lt: now } },
+            { usedAt: { lt: tokenRetentionCutoff } },
+          ],
+        },
+      });
+
+      // 4. Purge OAuth Exchange Codes: Expired codes OR consumed codes
+      const deletedOauthExchangeCodes = await tx.oauthExchangeCode.deleteMany({
+        where: {
+          OR: [{ expiresAt: { lt: now } }, { usedAt: { not: null } }],
+        },
+      });
+
+      // 5. Optionally purge old Login History
+      let deletedLoginHistoryCount = 0;
+      if (cleanLoginHistory) {
+        const deletedLoginHistory = await tx.loginHistory.deleteMany({
+          where: {
+            createdAt: { lt: loginHistoryCutoff },
+          },
+        });
+        deletedLoginHistoryCount = deletedLoginHistory.count;
+      }
+
+      const totalDeleted =
+        deletedRefreshTokens.count +
+        deletedEmailVerifications.count +
+        deletedPasswordResets.count +
+        deletedOauthExchangeCodes.count +
+        deletedLoginHistoryCount;
+
+      const details = {
+        refreshTokens: deletedRefreshTokens.count,
+        emailVerifications: deletedEmailVerifications.count,
+        passwordResets: deletedPasswordResets.count,
+        oauthExchangeCodes: deletedOauthExchangeCodes.count,
+        loginHistory: deletedLoginHistoryCount,
+      };
+
+      logger.info("Database maintenance cleanup executed successfully", {
+        adminId,
+        ip,
+        userAgent,
+        totalDeleted,
+        retentionDays,
+        details,
+      });
+
+      return {
+        summary: {
+          totalDeleted,
+          executedAt: now.toISOString(),
+          retentionDays,
+        },
+        details,
+      };
+    });
+  }
 }
 
 export default new AdminService();

@@ -196,41 +196,76 @@ const getAuditLogsSchema = {
  * Enforces that 'page' and 'limit' are positive integers, and validates optional filters.
  */
 const getLoginHistorySchema = {
-  query: z.object({
-    page: z.preprocess(
-      emptyToUndefined,
-      z.coerce.number().int().min(1, "Page must be at least 1").default(1),
-    ),
-    limit: z.preprocess(
-      emptyToUndefined,
-      z.coerce
-        .number()
-        .int()
-        .min(1)
-        .max(100, "Limit cannot exceed 100")
-        .default(10),
-    ),
-    userId: z.preprocess(
-      emptyToUndefined,
-      userIdParam.optional(),
-    ),
-    sortBy: z.preprocess(
-      emptyToUndefined,
-      z.enum(["createdAt", "success", "userId"]).default("createdAt"),
-    ),
-    sortOrder: z.preprocess(
-      val => {
-        const cleaned = emptyToUndefined(val);
-        return typeof cleaned === "string" ? cleaned.toLowerCase() : cleaned;
-      },
-      z.enum(["asc", "desc"]).default("desc"),
-    ),
-  }).strict(),
+  query: z
+    .object({
+      page: z.preprocess(
+        emptyToUndefined,
+        z.coerce.number().int().min(1, "Page must be at least 1").default(1),
+      ),
+      limit: z.preprocess(
+        emptyToUndefined,
+        z.coerce
+          .number()
+          .int()
+          .min(1)
+          .max(100, "Limit cannot exceed 100")
+          .default(10),
+      ),
+      userId: z.preprocess(emptyToUndefined, userIdParam.optional()),
+      sortBy: z.preprocess(
+        emptyToUndefined,
+        z.enum(["createdAt", "success", "userId"]).default("createdAt"),
+      ),
+      sortOrder: z.preprocess(
+        val => {
+          const cleaned = emptyToUndefined(val);
+          return typeof cleaned === "string" ? cleaned.toLowerCase() : cleaned;
+        },
+        z.enum(["asc", "desc"]).default("desc"),
+      ),
+    })
+    .strict(),
 };
+
+/**
+ * Validation schema for database maintenance cleanup task.
+ * Allows optional customization of retention windows for stale and expired records.
+ */
+const cleanupSchema = {
+  body: z
+    .object({
+      retentionDays: z.preprocess(
+        emptyToUndefined,
+        z.coerce
+          .number()
+          .int()
+          .min(1, "Retention days must be at least 1")
+          .max(365, "Retention days cannot exceed 365")
+          .default(7),
+      ),
+      cleanLoginHistory: z.preprocess(
+        emptyToUndefined,
+        z.coerce.boolean().default(false),
+      ),
+      loginHistoryRetentionDays: z.preprocess(
+        emptyToUndefined,
+        z.coerce
+          .number()
+          .int()
+          .min(7, "Login history retention must be at least 7 days")
+          .max(730, "Login history retention cannot exceed 730 days")
+          .default(90),
+      ),
+    })
+    .strict()
+    .default({}),
+};
+
 export default {
   getUsersSchema,
   userIdParamsSchema,
   patchUserSchema,
   getAuditLogsSchema,
   getLoginHistorySchema,
+  cleanupSchema,
 };

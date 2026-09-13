@@ -119,7 +119,6 @@ const logoutUserFromAllDevices = CatchAsync(async (req, res) => {
     ip: userIp,
     userAgent,
   });
-  console.log("Logout result:", result); // Debug log
 
   ApiResponse.success(
     res,

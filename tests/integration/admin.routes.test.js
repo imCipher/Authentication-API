@@ -429,6 +429,42 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
       expect(response.status).toBe(400);
       expect(response.body.error.code).toBe("VALIDATION_ERROR");
     });
+
+    it("should update a user's status to SUSPENDED and record a STATUS_CHANGE audit log (200 OK)", async () => {
+      const admin = await createTestUser("ADMIN", "ACTIVE");
+      const targetUser = await createTestUser("USER", "ACTIVE");
+
+      const response = await request(app)
+        .patch(`/api/v1/admin/users/${targetUser.user.id}`)
+        .set("Authorization", `Bearer ${admin.token}`)
+        .send({ status: "SUSPENDED" });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.user.status).toBe("SUSPENDED");
+
+      // Assert STATUS_CHANGE audit log
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          action: "STATUS_CHANGE",
+          details: { path: ["targetUserId"], equals: targetUser.user.id },
+        },
+      });
+      expect(audit).not.toBeNull();
+      expect(audit.details.newStatus).toBe("SUSPENDED");
+    });
+
+    it("should return 404 Not Found when updating a non-existent user", async () => {
+      const admin = await createTestUser("ADMIN", "ACTIVE");
+      const nonExistentId = crypto.randomUUID();
+
+      const response = await request(app)
+        .patch(`/api/v1/admin/users/${nonExistentId}`)
+        .set("Authorization", `Bearer ${admin.token}`)
+        .send({ role: "ADMIN" });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.message).toBe("User not found.");
+    });
   });
 
   // =========================================================================
@@ -494,6 +530,18 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
         "Cannot unlock an account with status 'SUSPENDED'",
       );
     });
+
+    it("should return 404 Not Found when unlocking a non-existent user", async () => {
+      const admin = await createTestUser("ADMIN", "ACTIVE");
+      const nonExistentId = crypto.randomUUID();
+
+      const response = await request(app)
+        .post(`/api/v1/admin/users/${nonExistentId}/unlock`)
+        .set("Authorization", `Bearer ${admin.token}`);
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.message).toBe("User not found.");
+    });
   });
 
   // =========================================================================
@@ -539,6 +587,18 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
       });
       expect(audit).not.toBeNull();
     });
+
+    it("should return 404 Not Found when logging out a non-existent user", async () => {
+      const admin = await createTestUser("ADMIN", "ACTIVE");
+      const nonExistentId = crypto.randomUUID();
+
+      const response = await request(app)
+        .post(`/api/v1/admin/users/${nonExistentId}/logout-all`)
+        .set("Authorization", `Bearer ${admin.token}`);
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.message).toBe("User not found.");
+    });
   });
 
   // =========================================================================
@@ -574,6 +634,19 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
       expect(audit).not.toBeNull();
     });
 
+    it("should prevent admin self-deletion with 403 Forbidden", async () => {
+      const admin = await createTestUser("ADMIN", "ACTIVE");
+
+      const response = await request(app)
+        .delete(`/api/v1/admin/users/${admin.user.id}`)
+        .set("Authorization", `Bearer ${admin.token}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body.error.message).toBe(
+        "Admin cannot delete their own account.",
+      );
+    });
+
     it("should reject deleting the last active admin with 400 Bad Request", async () => {
       // Suspend all other active admins so only soleAdmin will be active
       await prisma.user.updateMany({
@@ -597,28 +670,16 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
       );
     });
 
-    it("should reject deleting the last active admin with 400 Bad Request", async () => {
-      // Suspend all other active admins so only soleAdmin will be active
-      await prisma.user.updateMany({
-        where: { role: "ADMIN", status: "ACTIVE" },
-        data: { status: "SUSPENDED" },
-      });
-
-      // soleAdmin is the ONE AND ONLY active admin in the system
-      const soleAdmin = await createTestUser("ADMIN", "ACTIVE");
-
-      // callingAdmin has role: "ADMIN" but status: "SUSPENDED"
-      // Passes JWT auth and RBAC, but does not count towards activeAdminCount
-      const callingAdmin = await createTestUser("ADMIN", "SUSPENDED");
+    it("should return 404 Not Found when deleting a non-existent user", async () => {
+      const admin = await createTestUser("ADMIN", "ACTIVE");
+      const nonExistentId = crypto.randomUUID();
 
       const response = await request(app)
-        .delete(`/api/v1/admin/users/${soleAdmin.user.id}`)
-        .set("Authorization", `Bearer ${callingAdmin.token}`);
+        .delete(`/api/v1/admin/users/${nonExistentId}`)
+        .set("Authorization", `Bearer ${admin.token}`);
 
-      expect(response.status).toBe(400);
-      expect(response.body.error.message).toBe(
-        "Cannot delete the last active admin.",
-      );
+      expect(response.status).toBe(404);
+      expect(response.body.error.message).toBe("User not found.");
     });
   });
 
@@ -769,6 +830,37 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
 
       expect(response.status).toBe(400);
       expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    });
+
+    it("should enforce adminHeavyMaintenanceRateLimiter in production environment (429 Too Many Requests)", async () => {
+      // Temporarily enable production mode to activate rate limiters
+      finalConfig.env = "production";
+
+      const admin = await createTestUser("ADMIN", "ACTIVE");
+      const testIp = `203.0.113.${Math.floor(1 + Math.random() * 250)}`;
+
+      // The limiter allows 5 requests per 15 min window
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        const res = await request(app)
+          .post("/api/v1/admin/maintenance/cleanup")
+          .set("Authorization", `Bearer ${admin.token}`)
+          .set("X-Forwarded-For", testIp)
+          .send({ retentionDays: 7 });
+        expect(res.status).toBe(200);
+      }
+
+      // Request 6 from the same IP must be blocked
+      const blockedRes = await request(app)
+        .post("/api/v1/admin/maintenance/cleanup")
+        .set("Authorization", `Bearer ${admin.token}`)
+        .set("X-Forwarded-For", testIp)
+        .send({ retentionDays: 7 });
+
+      expect(blockedRes.status).toBe(429);
+      expect(blockedRes.body.success).toBe(false);
+      expect(blockedRes.body.error.message).toContain(
+        "Too many admin heavy maintenance requests from this IP, please try again later.",
+      );
     });
   });
 });

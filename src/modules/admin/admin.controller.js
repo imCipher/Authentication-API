@@ -195,6 +195,30 @@ const getLoginHistory = CatchAsync(async (req, res) => {
   });
 });
 
+/**
+ * @route POST /api/v1/admin/maintenance/cleanup
+ * @desc Trigger database maintenance cleanup of expired/stale records (Admin-only)
+ * @access Private/Admin
+ */
+const cleanupDatabase = CatchAsync(async (req, res) => {
+  const adminId = req.user.id;
+  const { userIp, userAgent } = getRequestMetadata(req);
+  const options = req.validated.body || {};
+
+  const cleanupResults = await AdminService.cleanupDatabase(options, {
+    adminId,
+    ip: userIp,
+    userAgent,
+  });
+
+  ApiResponse.success(
+    res,
+    "Database maintenance cleanup completed successfully.",
+    cleanupResults,
+  );
+});
+
+
 export default {
   getUsers,
   getUserById,
@@ -204,4 +228,5 @@ export default {
   deleteUser,
   getAuditLogs,
   getLoginHistory,
+  cleanupDatabase,
 };

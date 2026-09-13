@@ -848,4 +848,91 @@ router.get(
   adminController.getLoginHistory,
 );
 
+/**
+ * @swagger
+ * /admin/maintenance/cleanup:
+ *   post:
+ *     summary: Trigger database cleanup task (Admin-only)
+ *     description: Permanently purge expired and used tokens, reset requests, and OAuth codes. Optionally purge legacy login history records. Restricted to admin users only.
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               retentionDays:
+ *                 type: integer
+ *                 default: 7
+ *                 minimum: 1
+ *                 maximum: 365
+ *                 description: Days to retain revoked or consumed tokens before deletion.
+ *               cleanLoginHistory:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Whether to also purge old login history records.
+ *               loginHistoryRetentionDays:
+ *                 type: integer
+ *                 default: 90
+ *                 minimum: 7
+ *                 maximum: 730
+ *                 description: Days of login history to keep if cleanLoginHistory is true.
+ *     responses:
+ *       200:
+ *         description: Database cleanup executed successfully with deletion summary.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiSuccess'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         summary:
+ *                           type: object
+ *                           properties:
+ *                             totalDeleted:
+ *                               type: integer
+ *                               example: 45
+ *                             executedAt:
+ *                               type: string
+ *                               format: date-time
+ *                             retentionDays:
+ *                               type: integer
+ *                               example: 7
+ *                         details:
+ *                           type: object
+ *                           properties:
+ *                             refreshTokens:
+ *                               type: integer
+ *                               example: 20
+ *                             emailVerifications:
+ *                               type: integer
+ *                               example: 10
+ *                             passwordResets:
+ *                               type: integer
+ *                               example: 5
+ *                             oauthExchangeCodes:
+ *                               type: integer
+ *                               example: 10
+ *                             loginHistory:
+ *                               type: integer
+ *                               example: 0
+ *       401:
+ *         description: Unauthorized. Authentication required.
+ *       403:
+ *         description: Forbidden. Insufficient permissions, admin role required.
+ *       429:
+ *         description: Too many requests. Maintenance rate limit exceeded (5 requests per 15 minutes).
+ */
+router.post(
+  "/maintenance/cleanup",
+  adminHeavyMaintenanceRateLimiter,
+  validateRequest(adminSchema.cleanupSchema),
+  adminController.cleanupDatabase,
+);
+
 export default router;

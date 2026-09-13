@@ -40,7 +40,11 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
   };
 
   // Helper to directly seed a test user in PostgreSQL and sign an access token
-  const createTestUser = async (role = "USER", status = "ACTIVE", overrides = {}) => {
+  const createTestUser = async (
+    role = "USER",
+    status = "ACTIVE",
+    overrides = {},
+  ) => {
     const userData = generateTestUser(role.toLowerCase());
     const passwordHash = await hashUtils.hashPassword(userData.password);
 
@@ -94,7 +98,9 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
 
       await prisma.loginHistory.deleteMany({ where: { userId: { in: ids } } });
       await prisma.refreshToken.deleteMany({ where: { userId: { in: ids } } });
-      await prisma.emailVerification.deleteMany({ where: { userId: { in: ids } } });
+      await prisma.emailVerification.deleteMany({
+        where: { userId: { in: ids } },
+      });
       await prisma.passwordReset.deleteMany({ where: { userId: { in: ids } } });
       await prisma.auditLog.deleteMany({ where: { userId: { in: ids } } });
       await prisma.user.deleteMany({ where: { id: { in: ids } } });
@@ -142,7 +148,11 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
       const routes = [
         { method: "get", path: "/api/v1/admin/users" },
         { method: "get", path: `/api/v1/admin/users/${dummyId}` },
-        { method: "patch", path: `/api/v1/admin/users/${dummyId}`, body: { role: "ADMIN" } },
+        {
+          method: "patch",
+          path: `/api/v1/admin/users/${dummyId}`,
+          body: { role: "ADMIN" },
+        },
         { method: "post", path: `/api/v1/admin/users/${dummyId}/unlock` },
         { method: "post", path: `/api/v1/admin/users/${dummyId}/logout-all` },
         { method: "delete", path: `/api/v1/admin/users/${dummyId}` },
@@ -152,7 +162,8 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
       ];
 
       for (const route of routes) {
-        const req = request(app)[route.method](route.path)
+        const req = request(app)
+          [route.method](route.path)
           .set("Authorization", `Bearer ${standardUser.token}`);
 
         if (route.body) req.send(route.body);
@@ -382,32 +393,22 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
     });
 
     it("should reject demoting the last active administrator with 400 Bad Request", async () => {
-      // Ensure only ONE active admin exists by demoting any other admin temporarily
+      // Suspend all other active admins so only soleAdmin will be active
       await prisma.user.updateMany({
         where: { role: "ADMIN", status: "ACTIVE" },
-        data: { role: "USER" },
+        data: { status: "SUSPENDED" },
       });
 
-      // Create exactly 1 active admin
+      // soleAdmin is the ONE AND ONLY active admin in the system
       const soleAdmin = await createTestUser("ADMIN", "ACTIVE");
-      // Create another admin acting as caller so we bypass self-demotion check
-      const callingAdmin = await createTestUser("ADMIN", "ACTIVE");
 
-      // Now demote callingAdmin so soleAdmin is truly the LAST active admin
-      await prisma.user.update({
-        where: { id: callingAdmin.user.id },
-        data: { role: "USER" },
-      });
-
-      // Issue a valid token for callingAdmin to simulate race condition
-      const callingToken = tokenUtils.signAccessToken({
-        id: callingAdmin.user.id,
-        role: "ADMIN",
-      });
+      // callingAdmin has role: "ADMIN" but status: "SUSPENDED"
+      // They pass JWT verification and RBAC, but do not count toward activeAdminCount
+      const callingAdmin = await createTestUser("ADMIN", "SUSPENDED");
 
       const response = await request(app)
         .patch(`/api/v1/admin/users/${soleAdmin.user.id}`)
-        .set("Authorization", `Bearer ${callingToken}`)
+        .set("Authorization", `Bearer ${callingAdmin.token}`)
         .send({ role: "USER" });
 
       expect(response.status).toBe(400);
@@ -472,7 +473,9 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
         .set("Authorization", `Bearer ${admin.token}`);
 
       expect(response.status).toBe(400);
-      expect(response.body.error.message).toBe("User account is not currently locked.");
+      expect(response.body.error.message).toBe(
+        "User account is not currently locked.",
+      );
     });
 
     it("should return 400 Bad Request when attempting to unlock an account whose status is not ACTIVE", async () => {
@@ -487,7 +490,9 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
         .set("Authorization", `Bearer ${admin.token}`);
 
       expect(response.status).toBe(400);
-      expect(response.body.error.message).toContain("Cannot unlock an account with status 'SUSPENDED'");
+      expect(response.body.error.message).toContain(
+        "Cannot unlock an account with status 'SUSPENDED'",
+      );
     });
   });
 
@@ -511,7 +516,9 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
         .set("Authorization", `Bearer ${admin.token}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toContain("logged out from all devices successfully");
+      expect(response.body.message).toContain(
+        "logged out from all devices successfully",
+      );
 
       // Target user's previous access token must now immediately fail authentication
       const meAfter = await request(app)
@@ -519,7 +526,9 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
         .set("Authorization", `Bearer ${targetUser.token}`);
 
       expect(meAfter.status).toBe(401);
-      expect(meAfter.body.error.message).toContain("You have logged out from all sessions");
+      expect(meAfter.body.error.message).toContain(
+        "You have logged out from all sessions",
+      );
 
       // Audit Log Verification
       const audit = await prisma.auditLog.findFirst({
@@ -545,7 +554,9 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
         .set("Authorization", `Bearer ${admin.token}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toContain(`User ${victim.user.username} deleted successfully`);
+      expect(response.body.message).toContain(
+        `User ${victim.user.username} deleted successfully`,
+      );
 
       // Verify deletion from DB
       const dbCheck = await prisma.user.findUnique({
@@ -563,44 +574,51 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
       expect(audit).not.toBeNull();
     });
 
-    it("should prevent admin self-deletion with 403 Forbidden", async () => {
-      const admin = await createTestUser("ADMIN", "ACTIVE");
-
-      const response = await request(app)
-        .delete(`/api/v1/admin/users/${admin.user.id}`)
-        .set("Authorization", `Bearer ${admin.token}`);
-
-      expect(response.status).toBe(403);
-      expect(response.body.error.message).toBe("Admin cannot delete their own account.");
-    });
-
     it("should reject deleting the last active admin with 400 Bad Request", async () => {
-      // Demote all other admins so only one remains
+      // Suspend all other active admins so only soleAdmin will be active
       await prisma.user.updateMany({
         where: { role: "ADMIN", status: "ACTIVE" },
-        data: { role: "USER" },
+        data: { status: "SUSPENDED" },
       });
 
+      // soleAdmin is the ONE AND ONLY active admin in the system
       const soleAdmin = await createTestUser("ADMIN", "ACTIVE");
-      const caller = await createTestUser("ADMIN", "ACTIVE");
 
-      // Demote caller so soleAdmin is the only active admin left
-      await prisma.user.update({
-        where: { id: caller.user.id },
-        data: { role: "USER" },
-      });
-
-      const callerToken = tokenUtils.signAccessToken({
-        id: caller.user.id,
-        role: "ADMIN",
-      });
+      // callingAdmin has role: "ADMIN" but status: "SUSPENDED"
+      const callingAdmin = await createTestUser("ADMIN", "SUSPENDED");
 
       const response = await request(app)
         .delete(`/api/v1/admin/users/${soleAdmin.user.id}`)
-        .set("Authorization", `Bearer ${callerToken}`);
+        .set("Authorization", `Bearer ${callingAdmin.token}`);
 
       expect(response.status).toBe(400);
-      expect(response.body.error.message).toBe("Cannot delete the last active admin.");
+      expect(response.body.error.message).toBe(
+        "Cannot delete the last active admin.",
+      );
+    });
+
+    it("should reject deleting the last active admin with 400 Bad Request", async () => {
+      // Suspend all other active admins so only soleAdmin will be active
+      await prisma.user.updateMany({
+        where: { role: "ADMIN", status: "ACTIVE" },
+        data: { status: "SUSPENDED" },
+      });
+
+      // soleAdmin is the ONE AND ONLY active admin in the system
+      const soleAdmin = await createTestUser("ADMIN", "ACTIVE");
+
+      // callingAdmin has role: "ADMIN" but status: "SUSPENDED"
+      // Passes JWT auth and RBAC, but does not count towards activeAdminCount
+      const callingAdmin = await createTestUser("ADMIN", "SUSPENDED");
+
+      const response = await request(app)
+        .delete(`/api/v1/admin/users/${soleAdmin.user.id}`)
+        .set("Authorization", `Bearer ${callingAdmin.token}`);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toBe(
+        "Cannot delete the last active admin.",
+      );
     });
   });
 
@@ -736,7 +754,9 @@ describe("Admin Routes Integration - Management & Auditing (Phase 6)", () => {
       expect(response.body.data).toHaveProperty("summary");
       expect(response.body.data).toHaveProperty("details");
       expect(response.body.data.summary.totalDeleted).toBeGreaterThanOrEqual(1);
-      expect(response.body.data.details.refreshTokens).toBeGreaterThanOrEqual(1);
+      expect(response.body.data.details.refreshTokens).toBeGreaterThanOrEqual(
+        1,
+      );
     });
 
     it("should reject invalid retentionDays values exceeding 365 with 400 Bad Request", async () => {

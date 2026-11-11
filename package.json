@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Production-grade authentication REST API with JWT, refresh tokens, RBAC, OAuth2 [google and github], and email flows, built with Node.js, Express, and Prisma.",
   "license": "ISC",
-  "author": "Umzzy",
+  "author": "cipher",
   "type": "module",
   "main": "server.js",
   "scripts": {
@@ -32,7 +32,7 @@
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.11.0",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^10.4.0",
     "passport": "^0.7.0",
     "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
@@ -46,15 +46,24 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^5.0.0",
-    "@vitest/ui": "^5.0.0",
+    "@vitest/coverage-v8": "^5.1.0",
+    "@vitest/ui": "^5.1.0",
     "cross-env": "^10.1.0",
     "prisma": "^7.9.1",
     "supertest": "^7.2.2",
-    "vitest": "^5.0.0"
+    "vitest": "^5.1.0",
+    "nodemon": "^3.1.14"
   },
   "overrides": {
     "deepmerge-ts": "^8.0.2",
-    "mysql2": "^3.24.3"
+    "mysql2": "^3.24.3",
+    "glob": "^14.0.4",
+    "minimatch": "^11.0.5"
+  },
+  "allowScripts": {
+    "prisma@7.10.0": true,
+    "@prisma/engines@7.10.0": true,
+    "argon2@0.45.1": true,
+    "@scarf/scarf@1.4.0": true
   }
 }

@@ -281,6 +281,7 @@ describe("Auth Validation Schemas", () => {
   describe("verifyEmailSchema.body", () => {
     it("should accept a verification token of at least 6 characters", () => {
       const result = authValidation.verifyEmailSchema.body.safeParse({
+        email: "user@example.com",
         token: "123456",
       });
 
@@ -289,6 +290,7 @@ describe("Auth Validation Schemas", () => {
 
     it("should reject tokens shorter than 6 characters", () => {
       const result = authValidation.verifyEmailSchema.body.safeParse({
+        email: "user@example.com",
         token: "12345",
       });
 

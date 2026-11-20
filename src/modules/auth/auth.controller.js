@@ -43,10 +43,7 @@ const login = CatchAsync(async (req, res, next) => {
   const { loginIdentifier, password } = req.validated.body;
   const metadata = getRequestMetadata(req);
   const tokenPair = await AuthService.login(
-    {
-      loginIdentifier,
-      password,
-    },
+    { loginIdentifier, password },
     metadata,
   );
 
@@ -86,9 +83,9 @@ const refreshToken = CatchAsync(async (req, res, next) => {
  * @access Public
  */
 const verifyEmail = CatchAsync(async (req, res, next) => {
-  const { token } = req.validated.body;
+  const { email, token } = req.validated.body;
   const metadata = getRequestMetadata(req);
-  await AuthService.verifyEmail(token, metadata);
+  await AuthService.verifyEmail({ email, token }, metadata);
 
   ApiResponse.success(res, "Email verified successfully.");
 });
@@ -202,11 +199,7 @@ const updateProfile = CatchAsync(async (req, res, next) => {
   const metadata = getRequestMetadata(req);
   const updatedUser = await AuthService.updateUserProfile(
     id,
-    {
-      fullName,
-      username,
-      email,
-    },
+    { fullName, username, email },
     metadata,
   );
 

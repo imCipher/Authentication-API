@@ -220,8 +220,11 @@ router.post(
  *        application/json:
  *          schema:
  *            type: object
- *            required: [token]
+ *            required: [email, token]
  *            properties:
+ *              email:
+ *                type: string
+ *                example: "johndoe@example.com"
  *              token:
  *                type: string
  *                example: "123456"

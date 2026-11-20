@@ -1,0 +1,6 @@
+  </main>
+  <% (locals.scripts || []).forEach(src => { %>
+    <script src="<%= src %>" defer></script>
+  <% }) %>
+</body>
+</html>

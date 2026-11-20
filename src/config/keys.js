@@ -12,6 +12,7 @@ const config = {
   env: (process.env.NODE_ENV || "development").toLowerCase(),
   port: parseInt(process.env.PORT, 10) || 5000,
   apiVersion: process.env.API_VERSION || "v1",
+  appUrl: process.env.APP_URL || "http://localhost:3000",
 
   // Lockout
   lockout: {
@@ -88,6 +89,9 @@ const config = {
     username: process.env.ADMIN_USERNAME || "admin",
     password: process.env.ADMIN_PASSWORD || "Admin@12345",
   },
+
+  // CSRF
+  csrf: { secret: process.env.CSRF_SECRET || "default_csrf_secret" },
 };
 
 /**

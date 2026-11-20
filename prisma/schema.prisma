@@ -105,7 +105,8 @@ model RefreshToken {
 model EmailVerification {
   id        String    @id @default(uuid())  @db.Uuid
   userId    String    @map("user_id") @db.Uuid
-  tokenHash String    @unique  @map("token_hash")
+  tokenHash String    @map("token_hash")
+  attempts  Int       @default(0)
   expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
   createdAt DateTime  @default(now()) @map("created_at")

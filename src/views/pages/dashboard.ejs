@@ -1,0 +1,36 @@
+<%- include("../partials/app-start", { title: "Dashboard", active: "dashboard" }) %>
+
+<section class="page-head">
+  <h1>Welcome back, <%= user.fullName || user.username %></h1>
+  <p class="muted">Here's an overview of your account.</p>
+</section>
+
+<div class="cards">
+  <article class="card">
+    <h2>Account</h2>
+    <dl class="details">
+      <div>
+        <dt>Email</dt>
+        <dd>
+          <%= user.email %>
+          <span class="badge <%= user.emailVerified ? 'badge--ok' : 'badge--warn' %>">
+            <%= user.emailVerified ? "Verified" : "Not verified" %>
+          </span>
+        </dd>
+      </div>
+      <div><dt>Username</dt><dd><%= user.username ? "@" + user.username : "—" %></dd></div>
+      <div><dt>Role</dt><dd><%= user.role %></dd></div>
+    </dl>
+  </article>
+
+  <article class="card">
+    <h2>Activity</h2>
+    <dl class="details">
+      <div><dt>Member since</dt><dd><%= formatDate(user.createdAt) %></dd></div>
+      <div><dt>Last login</dt><dd><%= formatDate(user.lastLoginAt) %></dd></div>
+    </dl>
+    <a href="/settings" class="btn-ghost">Manage account →</a>
+  </article>
+</div>
+
+<%- include("../partials/app-end") %>

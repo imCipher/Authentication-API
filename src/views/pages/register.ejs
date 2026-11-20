@@ -1,0 +1,65 @@
+<%- include("../partials/auth-start", { title: "Create an Account", image: "/images/image-4.jpg", backHref: "/login" }) %>
+
+<%
+  // Small helpers so each field below stays short.
+  // err(name)  → the error message for that field, or undefined
+  // aria(name) → the accessibility attributes to add when that field has an error
+  const err = (name) => locals.errors?.[name];
+  const aria = (name) => err(name) ? `aria-invalid="true" aria-describedby="${name}-error"` : "";
+%>
+
+<h1>Create an Account</h1>
+<p class="auth-sub">Already have an account? <a href="/login">Log in</a></p>
+
+<% if (err("form")) { %>
+  <p class="auth-error" role="alert"><%= err("form") %></p>
+<% } %>
+
+<form method="post" action="/register" class="auth-form" novalidate>
+  <%- include("../partials/csrf") %>
+
+  <div class="field">
+    <input type="text" id="fullName" name="fullName" autocomplete="name" placeholder=" "
+           value="<%= locals.values?.fullName ?? '' %>" <%- aria("fullName") %> required>
+    <label for="fullName">Full name</label>
+  </div>
+  <% if (err("fullName")) { %><p class="field-error" id="fullName-error"><%= err("fullName") %></p><% } %>
+
+  <div class="field">
+    <input type="text" id="username" name="username" autocomplete="username" placeholder=" "
+           value="<%= locals.values?.username ?? '' %>" <%- aria("username") %> required>
+    <label for="username">Username</label>
+  </div>
+  <% if (err("username")) { %><p class="field-error" id="username-error"><%= err("username") %></p><% } %>
+
+  <div class="field">
+    <input type="email" id="email" name="email" autocomplete="email" placeholder=" "
+           value="<%= locals.values?.email ?? '' %>" <%- aria("email") %> required>
+    <label for="email">Email</label>
+  </div>
+  <% if (err("email")) { %><p class="field-error" id="email-error"><%= err("email") %></p><% } %>
+
+  <div class="field field-password">
+    <input type="password" id="password" name="password" autocomplete="new-password" placeholder=" "
+           <%- aria("password") %> required>
+    <label for="password">Password</label>
+    <button type="button" class="field-password__toggle" aria-label="Hold to show password">
+      <img src="/images/eye-closed.svg" alt="" width="24" height="24">
+    </button>
+  </div>
+  <% if (err("password")) { %><p class="field-error" id="password-error"><%= err("password") %></p><% } %>
+
+  <div class="field field-password">
+    <input type="password" id="confirmPassword" name="confirmPassword" autocomplete="new-password" placeholder=" "
+           <%- aria("confirmPassword") %> required>
+    <label for="confirmPassword">Confirm password</label>
+    <button type="button" class="field-password__toggle" aria-label="Hold to show password">
+      <img src="/images/eye-closed.svg" alt="" width="24" height="24">
+    </button>
+  </div>
+  <% if (err("confirmPassword")) { %><p class="field-error" id="confirmPassword-error"><%= err("confirmPassword") %></p><% } %>
+
+  <button type="submit" class="btn-primary">Create account</button>
+</form>
+
+<%- include("../partials/auth-end", { scripts: ["/js/scripts.js"] }) %>

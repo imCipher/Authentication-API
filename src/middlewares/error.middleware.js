@@ -75,18 +75,54 @@ export const errorHandler = (err, req, res, next) => {
     logger.error("UNHANDLED ERROR 💥", error, { cause: error.cause?.message });
   }
 
-  // Send error response
-  res.status(error.statusCode).json({
-    success: false,
-    error: {
-      status: error.status,
-      code:
-        error.code ||
-        DEFAULT_CODES[error.statusCode] ||
-        (error.statusCode >= 500 ? "INTERNAL_ERROR" : "CLIENT_ERROR"),
-      message: error.message,
-      errors: error.isOperational ? error.errors : undefined,
-      stack: finalConfig.env === "development" ? err.stack : undefined,
+  const PAGE_COPY = {
+    404: {
+      title: "Page not found",
+      message: "The page you're looking for doesn't exist or has been moved.",
     },
-  });
+    429: { title: "Slow down", message: null }, // null → use err.message (your limiter text)
+    403: { title: "Session expired", message: "This form expired. Please go back, refresh the page and try again." },
+    500: {
+      title: "Something went wrong",
+      message: "An unexpected error occurred. Please try again later.",
+    },
+  };
+
+  // Only real page loads get HTML. Missing images/css/js keep the small JSON 404.
+  const wantsPage =
+    !req.originalUrl.startsWith("/api") &&
+    req.headers.accept?.includes("text/html");
+
+  if (wantsPage) {
+    const statusCode = error.statusCode;
+    const copy =
+      PAGE_COPY[statusCode] || (statusCode >= 500 ? PAGE_COPY[500] : null);
+
+    return res
+      .status(statusCode)
+      .render("pages/error", {
+        title: copy?.title || "Something went wrong",
+        statusCode,
+        message:
+          copy?.message ||
+          (error.isOperational ? error.message : PAGE_COPY[500].message),
+      });
+  }
+
+  // Send error response
+  res
+    .status(error.statusCode)
+    .json({
+      success: false,
+      error: {
+        status: error.status,
+        code:
+          error.code ||
+          DEFAULT_CODES[error.statusCode] ||
+          (error.statusCode >= 500 ? "INTERNAL_ERROR" : "CLIENT_ERROR"),
+        message: error.message,
+        errors: error.isOperational ? error.errors : undefined,
+        stack: finalConfig.env === "development" ? err.stack : undefined,
+      },
+    });
 };

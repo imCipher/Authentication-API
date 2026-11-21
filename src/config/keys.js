@@ -101,7 +101,13 @@ const config = {
  */
 export const validateConfig = () => {
   if (config.env === "production") {
-    const required = ["DATABASE_URL", "APP_URL", "CRSF_SECRET", "REDIS_HOST", "EMAIL_HOST"];
+    const required = [
+      "DATABASE_URL",
+      "APP_URL",
+      "CSRF_SECRET",
+      "REDIS_HOST",
+      "EMAIL_HOST",
+    ];
     const missing = required.filter(key => !process.env[key]);
 
     if (missing.length > 0) {
@@ -109,17 +115,28 @@ export const validateConfig = () => {
         `Missing required environment variables: ${missing.join(", ")}`,
       );
     }
-  }
 
-  if (config.csrf.secret === "default_csrf_secret" || config.csrf.secret.length < 32) {
-      throw new Error("CSRF_SECRET must be a random string of at least 32 characters in production.");
+    if (
+      config.csrf.secret === "default_csrf_secret" ||
+      config.csrf.secret.length < 32
+    ) {
+      throw new Error(
+        "CSRF_SECRET must be a random string of at least 32 characters in production.",
+      );
     }
+
     if (!config.appUrl.startsWith("https://")) {
-      throw new Error(`APP_URL must be an https:// URL in production, got "${config.appUrl}".`);
+      throw new Error(
+        `APP_URL must be an https:// URL in production, got "${config.appUrl}".`,
+      );
     }
+
     if (config.cors.origin === "*") {
-      throw new Error("ALLOWED_ORIGINS must list your real domain(s) in production, not '*'.");
+      throw new Error(
+        "ALLOWED_ORIGINS must list your real domain(s) in production, not '*'.",
+      );
     }
+  }
 
   if (!config.jwt.refreshSecret || config.jwt.refreshSecret.length < 32) {
     throw new Error(

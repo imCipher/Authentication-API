@@ -20,30 +20,40 @@ const userIdParam = z
 
 /**
  * Reusable user role schema with case normalization and custom error messages.
+ *
+ * `.optional()` must be INSIDE the preprocess: an outer `.optional()` only skips
+ * a value that is already `undefined` BEFORE preprocessing. An empty "?role=" (what
+ * an HTML <select> sends for "Any role") is "", so it went through emptyToUndefined,
+ * became `undefined`, and then failed the enum.
  */
 const userRoleSchema = z.preprocess(
   val => {
     const cleaned = emptyToUndefined(val);
     return typeof cleaned === "string" ? cleaned.toUpperCase() : cleaned;
   },
-  z.enum(["USER", "ADMIN"], {
-    errorMap: () => ({ message: "Role must be either 'USER' or 'ADMIN'" }),
-  }),
+  z
+    .enum(["USER", "ADMIN"], {
+      errorMap: () => ({ message: "Role must be either 'USER' or 'ADMIN'" }),
+    })
+    .optional(),
 );
 
 /**
  * Reusable user status schema with case normalization and custom error messages.
+ * (`.optional()` inside the preprocess for the same reason as userRoleSchema.)
  */
 const userStatusSchema = z.preprocess(
   val => {
     const cleaned = emptyToUndefined(val);
     return typeof cleaned === "string" ? cleaned.toUpperCase() : cleaned;
   },
-  z.enum(["ACTIVE", "SUSPENDED", "DEACTIVATED"], {
-    errorMap: () => ({
-      message: "Status must be 'ACTIVE', 'SUSPENDED', or 'DEACTIVATED'",
-    }),
-  }),
+  z
+    .enum(["ACTIVE", "SUSPENDED", "DEACTIVATED"], {
+      errorMap: () => ({
+        message: "Status must be 'ACTIVE', 'SUSPENDED', or 'DEACTIVATED'",
+      }),
+    })
+    .optional(),
 );
 
 /**

@@ -84,6 +84,26 @@ describe("Admin Validation Schemas", () => {
       );
     });
 
+    it("should treat empty role/status (an HTML form's 'Any' option) as no filter", () => {
+      const result = adminValidation.getUsersSchema.query.safeParse({
+        search: "",
+        role: "",
+        status: "SUSPENDED",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data.role).toBeUndefined();
+      expect(result.data.status).toBe("SUSPENDED");
+
+      const onlyRole = adminValidation.getUsersSchema.query.safeParse({
+        role: "admin",
+        status: "",
+      });
+      expect(onlyRole.success).toBe(true);
+      expect(onlyRole.data.role).toBe("ADMIN");
+      expect(onlyRole.data.status).toBeUndefined();
+    });
+
     it("should reject search query exceeding 100 characters", () => {
 
       // Generate a string of 101 characters

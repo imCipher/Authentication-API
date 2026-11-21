@@ -227,6 +227,33 @@ describe("Admin pages (server-rendered)", () => {
       expect(res.text).toMatch(/<option value="SUSPENDED"\s+selected/); // dropdown remembers it
     });
 
+    it("filtering only by status works with the form's empty role (?role=&status=…)", async () => {
+      const suspended = await createUser("formsusp", { status: "SUSPENDED" });
+      const active = await createUser("formact");
+
+      // exactly what the filter form submits when "Any role" is left selected
+      const res = await adminAgent
+        .get(`/admin/users?search=adm_${RUN}&role=&status=SUSPENDED&sortBy=createdAt&sortOrder=desc&limit=100`)
+        .set(HTML);
+
+      expect(res.status).toBe(200);
+      expect(res.text).not.toContain("Some filters were invalid");
+      expect(res.text).toContain(suspended.email);
+      expect(res.text).not.toContain(active.email);
+    });
+
+    it("filtering only by role works with the form's empty status", async () => {
+      const promoted = await createUser("formadmin", { role: "ADMIN" });
+
+      const res = await adminAgent
+        .get(`/admin/users?search=${promoted.username}&role=ADMIN&status=`)
+        .set(HTML);
+
+      expect(res.status).toBe(200);
+      expect(res.text).not.toContain("Some filters were invalid");
+      expect(res.text).toContain(promoted.email);
+    });
+
     it("pagination links keep the current filters", async () => {
       await createUser("pagea");
       await createUser("pageb");

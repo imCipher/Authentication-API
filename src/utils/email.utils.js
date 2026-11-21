@@ -32,10 +32,7 @@ class Email {
       port: finalConfig.email.port,
       secure: false, // false means "use STARTTLS instead of immediate TLS"
       requireTLS: true, // Forces STARTTLS upgrade
-      auth: {
-        user: finalConfig.email.user,
-        pass: finalConfig.email.pass,
-      },
+      auth: { user: finalConfig.email.user, pass: finalConfig.email.pass },
       connectionTimeout: 10000, // 10 seconds
       greetingTimeout: 10000, // 10 seconds
       socketTimeout: 10000, // 10 seconds
@@ -55,17 +52,12 @@ class Email {
       {
         firstName: this.firstName,
         code: this.code,
-        url: `http://localhost:3000/reset-password/${urlCode}`,
+        url: `${finalConfig.appUrl}/reset-password/${urlCode}`,
         subject,
       },
     );
 
-    const mailOptions = {
-      from: this.from,
-      to: this.to,
-      subject,
-      html,
-    };
+    const mailOptions = { from: this.from, to: this.to, subject, html };
 
     await this.newTransport().sendMail(mailOptions);
   }

@@ -1,0 +1,52 @@
+<%- include("../partials/auth-start", { title: "Verify your email", image: "/images/image-5.jpg", backHref: "/register" }) %>
+
+<h1>Verification Code</h1>
+<p class="auth-sub">
+  <% if (email) { %>
+    We sent a 6-digit code to <strong><%= email %></strong>. It expires in 5 minutes.
+  <% } else { %>
+    Enter the 6-digit code we emailed you.
+  <% } %>
+</p>
+
+<% if (error)  { %><p class="auth-error" role="alert"><%= error %></p><% } %>
+<% if (notice) { %><p class="notice" role="status"><%= notice %></p><% } %>
+
+<form method="post" action="/verify-email" class="auth-form" novalidate>
+  <%- include("../partials/csrf") %>
+    <% if (email) { %>
+        <input type="hidden" name="email" value="<%= email %>">
+    <% } else { %>
+    <div class="field">
+        <input type="email" id="verifyEmail" name="email" autocomplete="email" placeholder=" " required>
+        <label for="verifyEmail">Your email</label>
+    </div>
+    <% } %>
+
+
+  <!-- One real input. JS swaps it for 6 boxes; without JS this still works. -->
+  <div class="field" id="token-field">
+    <input type="text" id="token" name="token" inputmode="numeric" autocomplete="one-time-code"
+           pattern="[0-9]*" maxlength="6" placeholder=" " autofocus>
+    <label for="token">Verification code</label>
+  </div>
+
+  <button type="submit" class="btn-primary">Verify</button>
+</form>
+
+<form method="post" action="/verify-email/resend" class="resend">
+  <%- include("../partials/csrf") %>
+  <% if (email) { %>
+    <input type="hidden" name="email" value="<%= email %>">
+  <% } else { %>
+    <div class="field">
+      <input type="email" id="resendEmail" name="email" autocomplete="email" placeholder=" ">
+      <label for="resendEmail">Your email</label>
+    </div>
+  <% } %>
+  <p>Didn't get the code?
+    <button type="submit" class="link-button" data-resend data-cooldown="60">Resend code</button>
+  </p>
+</form>
+
+<%- include("../partials/auth-end", { scripts: ["/js/otp.js"] }) %>

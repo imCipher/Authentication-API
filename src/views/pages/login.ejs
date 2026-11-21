@@ -1,0 +1,34 @@
+<%- include("../partials/auth-start", { title: "Log in", image: "/images/login.jpg", backHref: "/login"}) %>
+
+<h1>Log in</h1>
+<p class="auth-sub">Don't have an account? <a href="/register">Create an Account</a></p>
+
+<% if (locals.error) { %>
+    <p class="auth-error" role="alert"><%= error %></p>
+<% } %>
+
+<% if (locals.notice) { %><p class="notice" role="status"><%= notice %></p><% } %>
+
+
+<form method="post" action="/login" class="auth-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="field">
+        <input type="text" id="loginIdentifier" name="loginIdentifier" autocomplete="username" placeholder=" " value="<%= locals.values?.loginIdentifier ?? '' %>" required>
+        <label for="loginIdentifier">Email or Username</label>
+    </div>
+
+    <div class="field field-password">
+        <input type="password" id="password" name="password" autocomplete="current-password" placeholder=" " required>
+        <label for="password">Password</label>
+        <button type="button" class="field-password__toggle" aria-label="Show password">
+            <img src="/images/eye-closed.svg" alt="" width="24" height="24">
+        </button>
+    </div>
+
+    <a href="/forgot-password" class="auth-forgot">Forgot Password?</a>
+    <button type="submit" class="btn-primary">Log in</button>
+</form>
+
+<%- include("../partials/social") %>
+
+<%- include("../partials/auth-end", { scripts: ["/js/scripts.js"] }) %>

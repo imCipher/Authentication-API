@@ -1,0 +1,48 @@
+<%- include("../../partials/admin-start") %>
+
+<section class="card">
+  <h2>Database cleanup</h2>
+  <p class="muted">
+    Deletes expired and already-used records: refresh tokens, email verification codes,
+    password reset links and OAuth exchange codes. Optionally also old login history.
+    Users and audit logs are never touched.
+  </p>
+
+  <form method="post" action="/admin/maintenance/cleanup" class="maintenance-form">
+    <%- include("../../partials/csrf") %>
+
+    <label class="filters__field">
+      <span>Keep revoked / used tokens for (days)</span>
+      <input type="number" name="retentionDays" min="1" max="365" value="<%= values.retentionDays %>" required>
+    </label>
+
+    <label class="checkbox">
+      <input type="checkbox" name="cleanLoginHistory" <%= values.cleanLoginHistory ? "checked" : "" %>>
+      <span>Also delete old login history</span>
+    </label>
+
+    <label class="filters__field">
+      <span>Keep login history for (days)</span>
+      <input type="number" name="loginHistoryRetentionDays" min="7" max="730" value="<%= values.loginHistoryRetentionDays %>" required>
+    </label>
+
+    <button type="submit" class="btn-primary">Run cleanup</button>
+  </form>
+</section>
+
+<% if (result) { %>
+  <section class="card" role="status">
+    <h2>Cleanup finished</h2>
+    <p><strong><%= result.summary.totalDeleted %></strong> record<%= result.summary.totalDeleted === 1 ? "" : "s" %> deleted
+      at <%= formatDate(result.summary.executedAt) %>.</p>
+    <dl class="details">
+      <div><dt>Refresh tokens</dt><dd><%= result.details.refreshTokens %></dd></div>
+      <div><dt>Email verification codes</dt><dd><%= result.details.emailVerifications %></dd></div>
+      <div><dt>Password reset links</dt><dd><%= result.details.passwordResets %></dd></div>
+      <div><dt>OAuth exchange codes</dt><dd><%= result.details.oauthExchangeCodes %></dd></div>
+      <div><dt>Login history</dt><dd><%= result.details.loginHistory %></dd></div>
+    </dl>
+  </section>
+<% } %>
+
+<%- include("../../partials/app-end") %>

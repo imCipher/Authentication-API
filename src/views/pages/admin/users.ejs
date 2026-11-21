@@ -1,0 +1,86 @@
+<%- include("../../partials/admin-start") %>
+
+<%
+  const STATUS_BADGE = { ACTIVE: "badge--ok", SUSPENDED: "badge--warn", DEACTIVATED: "badge--danger" };
+  // column header that sorts by `field`; shows ↑/↓ on the active column
+  const arrow = field => filters.sortBy === field ? (filters.sortOrder === "asc" ? " ↑" : " ↓") : "";
+  const ariaSort = field => filters.sortBy === field ? (filters.sortOrder === "asc" ? "ascending" : "descending") : "none";
+%>
+
+<!-- GET form: the filters become the URL, so a filtered view can be bookmarked or shared -->
+<form method="get" action="/admin/users" class="filters" role="search">
+  <label class="filters__field filters__field--grow">
+    <span>Search</span>
+    <input type="search" name="search" value="<%= filters.search ?? '' %>" placeholder="Name, email or username" maxlength="100">
+  </label>
+
+  <label class="filters__field">
+    <span>Role</span>
+    <select name="role">
+      <option value="">Any role</option>
+      <% ["USER", "ADMIN"].forEach(r => { %>
+        <option value="<%= r %>" <%= filters.role === r ? "selected" : "" %>><%= r %></option>
+      <% }) %>
+    </select>
+  </label>
+
+  <label class="filters__field">
+    <span>Status</span>
+    <select name="status">
+      <option value="">Any status</option>
+      <% ["ACTIVE", "SUSPENDED", "DEACTIVATED"].forEach(s => { %>
+        <option value="<%= s %>" <%= filters.status === s ? "selected" : "" %>><%= s %></option>
+      <% }) %>
+    </select>
+  </label>
+
+  <!-- keep the current sort when filtering -->
+  <input type="hidden" name="sortBy" value="<%= filters.sortBy %>">
+  <input type="hidden" name="sortOrder" value="<%= filters.sortOrder %>">
+
+  <div class="filters__actions">
+    <button type="submit" class="btn-primary btn-small">Apply</button>
+    <a href="/admin/users" class="btn-ghost">Reset</a>
+  </div>
+</form>
+
+<% if (users.length === 0) { %>
+  <p class="empty-state">No users match these filters.</p>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th aria-sort="<%= ariaSort('fullName') %>"><a href="<%= sortUrl('fullName') %>">Name<%= arrow("fullName") %></a></th>
+          <th aria-sort="<%= ariaSort('email') %>"><a href="<%= sortUrl('email') %>">Email<%= arrow("email") %></a></th>
+          <th>Role</th>
+          <th>Status</th>
+          <th aria-sort="<%= ariaSort('lastLoginAt') %>"><a href="<%= sortUrl('lastLoginAt') %>">Last login<%= arrow("lastLoginAt") %></a></th>
+          <th aria-sort="<%= ariaSort('createdAt') %>"><a href="<%= sortUrl('createdAt') %>">Joined<%= arrow("createdAt") %></a></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% users.forEach(u => { %>
+          <tr>
+            <td>
+              <a href="/admin/users/<%= u.id %>" class="data-table__primary"><%= u.fullName %></a>
+              <span class="muted">@<%= u.username %></span>
+            </td>
+            <td>
+              <%= u.email %>
+              <% if (!u.emailVerified) { %><span class="badge badge--warn">Unverified</span><% } %>
+            </td>
+            <td><span class="badge <%= u.role === 'ADMIN' ? 'badge--admin' : 'badge--muted' %>"><%= u.role %></span></td>
+            <td><span class="badge <%= STATUS_BADGE[u.status] %>"><%= u.status %></span></td>
+            <td><%= formatDate(u.lastLoginAt) %></td>
+            <td><%= formatDate(u.createdAt) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include("../../partials/pagination") %>
+
+<%- include("../../partials/app-end") %>

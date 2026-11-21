@@ -245,7 +245,7 @@ const cleanupSchema = {
       ),
       cleanLoginHistory: z.preprocess(
         emptyToUndefined,
-        z.coerce.boolean().default(false),
+        z.boolean().default(false),
       ),
       loginHistoryRetentionDays: z.preprocess(
         emptyToUndefined,

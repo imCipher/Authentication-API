@@ -1,0 +1,11 @@
+<%- include("../partials/auth-start", { title, image: "/images/image-5.jpg" }) %>
+
+<div class="error-page">
+  <p class="error-code"><%= statusCode %></p>
+  <h1><%= title %></h1>
+  <p class="auth-sub"><%= message %></p>
+
+  <a href="/login" class="btn-primary">Back to log in</a>
+</div>
+
+<%- include("../partials/auth-end") %>

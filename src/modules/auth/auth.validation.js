@@ -129,6 +129,7 @@ const registerSchema = {
     })
     .refine(data => data.password === data.confirmPassword, {
       message: "Passwords do not match",
+      path: ["confirmPassword"], // This ensures the error is associated with the confirmPassword field
     })
     .strict(),
 };
@@ -151,11 +152,7 @@ const loginSchema = {
  * This schema ensures that the email is provided and meets the specified criteria.
  */
 const resendVerificationSchema = {
-  body: z
-    .object({
-      email: emailSchema,
-    })
-    .strict(),
+  body: z.object({ email: emailSchema }).strict(),
 };
 
 /**
@@ -164,9 +161,7 @@ const resendVerificationSchema = {
  */
 const refreshTokenSchema = {
   body: z
-    .object({
-      refreshToken: z.string("Refresh token is required").min(1),
-    })
+    .object({ refreshToken: z.string("Refresh token is required").min(1) })
     .strict(),
 };
 
@@ -175,11 +170,17 @@ const refreshTokenSchema = {
  * This schema ensures that the verification token is provided and meets the specified criteria.
  */
 const verifyEmailSchema = {
-  body: z.object({
-    token: z
-      .string("Verification token is required")
-      .min(6, "Verification token must be at least 6 characters long"),
-  }),
+  body: z
+    .object({
+      email: emailSchema,
+      token: z
+        .string("Verification token is required")
+        .trim()
+        .min(6, "Verification token must be at least 6 characters long")
+        .max(6, "Verification code must be 6 digits")
+        .regex(/^\d+$/, "Verification code must contain only digits"),
+    })
+    .strict(),
 };
 
 /**
@@ -187,9 +188,7 @@ const verifyEmailSchema = {
  * This schema ensures that the email is provided and meets the specified criteria.
  */
 const resendVerificationEmailSchema = {
-  body: z.object({
-    email: emailSchema,
-  }),
+  body: z.object({ email: emailSchema }),
 };
 
 /**
@@ -219,6 +218,7 @@ const resetPasswordSchema = {
     })
     .refine(data => data.newPassword === data.confirmNewPassword, {
       message: "Passwords do not match",
+      path: ["confirmNewPassword"],
     })
     .strict(),
 };
@@ -231,14 +231,9 @@ const changePasswordSchema = {
   body: z
     .object({
       currentPassword: z
-        .string("Password is required")
-        .normalize("NFC")
-        .min(8, "Password must be at least 8 characters long")
-        .max(72, "Password must not exceed 72 characters")
-        .regex(
-          /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).*$/,
-          "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
-        ),
+        .string()
+        .min(1, "Current password is required")
+        .max(72, "Password must not exceed 72 characters"),
       newPassword: z
         .string("Password is required")
         .normalize("NFC")

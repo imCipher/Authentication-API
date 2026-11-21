@@ -1,0 +1,181 @@
+<%- include("../../partials/admin-start") %>
+
+<%
+  const STATUS_BADGE = { ACTIVE: "badge--ok", SUSPENDED: "badge--warn", DEACTIVATED: "badge--danger" };
+  const base = `/admin/users/${target.id}`;
+%>
+
+<p><a href="/admin/users" class="back-link">← All users</a></p>
+
+<div class="cards">
+  <!-- Account -->
+  <article class="card">
+    <h2>Account</h2>
+    <dl class="details">
+      <div><dt>Name</dt><dd><%= target.fullName %></dd></div>
+      <div><dt>Username</dt><dd>@<%= target.username %></dd></div>
+      <div>
+        <dt>Email</dt>
+        <dd>
+          <%= target.email %>
+          <span class="badge <%= target.emailVerified ? 'badge--ok' : 'badge--warn' %>">
+            <%= target.emailVerified ? "Verified" : "Unverified" %>
+          </span>
+        </dd>
+      </div>
+      <div><dt>Role</dt><dd><span class="badge <%= target.role === 'ADMIN' ? 'badge--admin' : 'badge--muted' %>"><%= target.role %></span></dd></div>
+      <div><dt>Status</dt><dd><span class="badge <%= STATUS_BADGE[target.status] %>"><%= target.status %></span></dd></div>
+      <div>
+        <dt>Sign-in methods</dt>
+        <dd>
+          <% if (target.oauthAccounts.length === 0) { %>Password<% } %>
+          <% target.oauthAccounts.forEach(a => { %><span class="badge badge--muted"><%= a.provider %></span><% }) %>
+        </dd>
+      </div>
+    </dl>
+  </article>
+
+  <!-- Security -->
+  <article class="card">
+    <h2>Security</h2>
+    <dl class="details">
+      <div>
+        <dt>Lockout</dt>
+        <dd>
+          <% if (isLocked) { %>
+            <span class="badge badge--danger">Locked</span>
+            <%= target.failedAttempts %> failed attempt<%= target.failedAttempts === 1 ? "" : "s" %>
+          <% } else { %>
+            <span class="badge badge--ok">Not locked</span>
+          <% } %>
+        </dd>
+      </div>
+      <% if (target.lockedUntil) { %><div><dt>Locked until</dt><dd><%= formatDate(target.lockedUntil) %></dd></div><% } %>
+      <div><dt>Last login</dt><dd><%= formatDate(target.lastLoginAt) %></dd></div>
+      <div><dt>Last login IP</dt><dd><%= target.lastLoginIp ?? "—" %></dd></div>
+      <div><dt>Password changed</dt><dd><%= formatDate(target.passwordChangedAt) %></dd></div>
+      <div><dt>Sessions revoked</dt><dd><%= formatDate(target.sessionsRevokedAt) %></dd></div>
+      <div><dt>Joined</dt><dd><%= formatDate(target.createdAt) %></dd></div>
+    </dl>
+  </article>
+</div>
+
+<!-- Actions -->
+<section class="card admin-actions">
+  <h2>Actions</h2>
+
+  <% if (isSelf) { %>
+    <p class="muted">This is your own account. You can't change your own role or status, or delete yourself — another admin has to do that.</p>
+  <% } %>
+
+  <div class="action-grid">
+    <% if (!isSelf) { %>
+      <form method="post" action="<%= base %>/role" class="action">
+        <%- include("../../partials/csrf") %>
+        <label for="role"><strong>Role</strong></label>
+        <p class="muted">Changing the role logs the user out of every device.</p>
+        <div class="action__row">
+          <select id="role" name="role">
+            <% ["USER", "ADMIN"].forEach(r => { %>
+              <option value="<%= r %>" <%= target.role === r ? "selected" : "" %>><%= r %></option>
+            <% }) %>
+          </select>
+          <button type="submit" class="btn-ghost">Update role</button>
+        </div>
+      </form>
+
+      <form method="post" action="<%= base %>/status" class="action">
+        <%- include("../../partials/csrf") %>
+        <label for="status"><strong>Status</strong></label>
+        <p class="muted">Suspended or deactivated users can't log in.</p>
+        <div class="action__row">
+          <select id="status" name="status">
+            <% ["ACTIVE", "SUSPENDED", "DEACTIVATED"].forEach(s => { %>
+              <option value="<%= s %>" <%= target.status === s ? "selected" : "" %>><%= s %></option>
+            <% }) %>
+          </select>
+          <button type="submit" class="btn-ghost">Update status</button>
+        </div>
+      </form>
+    <% } %>
+
+    <form method="post" action="<%= base %>/unlock" class="action">
+      <%- include("../../partials/csrf") %>
+      <strong>Unlock</strong>
+      <p class="muted">Clears failed login attempts and any lockout.</p>
+      <button type="submit" class="btn-ghost" <%= isLocked ? "" : "disabled" %>>Unlock account</button>
+    </form>
+
+    <form method="post" action="<%= base %>/logout-all" class="action">
+      <%- include("../../partials/csrf") %>
+      <strong>Sessions</strong>
+      <p class="muted">Ends every session on every device.</p>
+      <button type="submit" class="btn-ghost">Log out everywhere</button>
+    </form>
+  </div>
+
+  <% if (!isSelf) { %>
+    <!-- Danger zone: typing the username is the confirmation (works without JavaScript) -->
+    <form method="post" action="<%= base %>/delete" class="danger-zone">
+      <%- include("../../partials/csrf") %>
+      <h3>Delete user</h3>
+      <p class="muted">This permanently deletes the account and all of its sessions and history. It can't be undone.</p>
+      <label for="confirmUsername">Type <strong><%= target.username %></strong> to confirm</label>
+      <div class="action__row">
+        <input type="text" id="confirmUsername" name="confirmUsername" autocomplete="off" spellcheck="false">
+        <button type="submit" class="btn-danger">Delete user</button>
+      </div>
+    </form>
+  <% } %>
+</section>
+
+<!-- Recent logins -->
+<section class="card">
+  <h2>Recent logins</h2>
+  <% if (loginHistory.length === 0) { %>
+    <p class="muted">No login attempts recorded.</p>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>When</th><th>Result</th><th>IP</th><th>Reason</th></tr></thead>
+        <tbody>
+          <% loginHistory.forEach(l => { %>
+            <tr>
+              <td><%= formatDate(l.createdAt) %></td>
+              <td><span class="badge <%= l.success ? 'badge--ok' : 'badge--danger' %>"><%= l.success ? "Success" : "Failed" %></span></td>
+              <td><%= l.ipAddress %></td>
+              <td><%= l.reason ?? "—" %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <p><a href="/admin/login-history?userId=<%= target.id %>">See all logins →</a></p>
+  <% } %>
+</section>
+
+<!-- Activity -->
+<section class="card">
+  <h2>Activity by this user</h2>
+  <% if (auditLogs.length === 0) { %>
+    <p class="muted">No audit entries yet.</p>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>When</th><th>Action</th><th>Details</th></tr></thead>
+        <tbody>
+          <% auditLogs.forEach(log => { %>
+            <tr>
+              <td><%= formatDate(log.createdAt) %></td>
+              <td><span class="badge badge--muted"><%= log.action %></span></td>
+              <td class="data-table__details"><%= log.details?.message ?? JSON.stringify(log.details ?? {}) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <p><a href="/admin/audit-logs?search=<%= target.id %>">See all activity →</a></p>
+  <% } %>
+</section>
+
+<%- include("../../partials/app-end") %>

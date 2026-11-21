@@ -12,6 +12,7 @@ const config = {
   env: (process.env.NODE_ENV || "development").toLowerCase(),
   port: parseInt(process.env.PORT, 10) || 5000,
   apiVersion: process.env.API_VERSION || "v1",
+  appUrl: process.env.APP_URL || "http://localhost:3000",
 
   // Lockout
   lockout: {
@@ -86,8 +87,11 @@ const config = {
     fullName: process.env.ADMIN_FULL_NAME || "Super Administrator",
     email: process.env.ADMIN_EMAIL || "admin@example.com",
     username: process.env.ADMIN_USERNAME || "admin",
-    password: process.env.ADMIN_PASSWORD || "Admin@12345",
+    password: process.env.ADMIN_PASSWORD,
   },
+
+  // CSRF
+  csrf: { secret: process.env.CSRF_SECRET || "default_csrf_secret" },
 };
 
 /**
@@ -97,12 +101,39 @@ const config = {
  */
 export const validateConfig = () => {
   if (config.env === "production") {
-    const required = ["DATABASE_URL"];
+    const required = [
+      "DATABASE_URL",
+      "APP_URL",
+      "CSRF_SECRET",
+      "REDIS_HOST",
+      "EMAIL_HOST",
+    ];
     const missing = required.filter(key => !process.env[key]);
 
     if (missing.length > 0) {
       throw new Error(
         `Missing required environment variables: ${missing.join(", ")}`,
+      );
+    }
+
+    if (
+      config.csrf.secret === "default_csrf_secret" ||
+      config.csrf.secret.length < 32
+    ) {
+      throw new Error(
+        "CSRF_SECRET must be a random string of at least 32 characters in production.",
+      );
+    }
+
+    if (!config.appUrl.startsWith("https://")) {
+      throw new Error(
+        `APP_URL must be an https:// URL in production, got "${config.appUrl}".`,
+      );
+    }
+
+    if (config.cors.origin === "*") {
+      throw new Error(
+        "ALLOWED_ORIGINS must list your real domain(s) in production, not '*'.",
       );
     }
   }
@@ -113,7 +144,7 @@ export const validateConfig = () => {
     );
   }
 
-  if (!/^[0-9]$/.test(String(config.jwt.refreshExpiresIn))) {
+  if (!/^[0-9]+$/.test(String(config.jwt.refreshExpiresIn))) {
     throw new Error(
       `JWT_REFRESH_EXPIRES_IN must be a number (e.g. "7"), got "${config.jwt.refreshExpiresIn}"`,
     );
@@ -128,6 +159,12 @@ export const validateConfig = () => {
   if (!/^\d+(ms|s|m|h|d)$/.test(String(config.jwt.accessExpiresIn))) {
     throw new Error(
       `JWT_ACCESS_EXPIRES_IN must include a unit (e.g. "15m"), got "${config.jwt.accessExpiresIn}"`,
+    );
+  }
+
+  if (!config.adminSeed.password || config.adminSeed.password.length < 8) {
+    throw new Error(
+      "ADMIN_PASSWORD is not set or is too short. The default admin account cannot be created.",
     );
   }
 

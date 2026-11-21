@@ -11,6 +11,13 @@ process.env.JWT_REFRESH_EXPIRES_IN = "7";
 process.env.JWT_REFRESH_GRACE_WINDOW_SECONDS = "30";
 process.env.EMAIL_USER = "test@example.com";
 process.env.EMAIL_PASS = "testpassword";
+process.env.CSRF_SECRET = "test-csrf-secret-at-least-32-characters-long";
+process.env.APP_URL = "http://localhost:5001";
+// Fake Google OAuth credentials: the strategies register, but tests never reach
+// Google — the network calls are replaced with fakes inside the tests themselves
+process.env.GOOGLE_CLIENT_ID = "test-google-client-id.apps.googleusercontent.com";
+process.env.GOOGLE_CLIENT_SECRET = "test-google-client-secret";
+process.env.GOOGLE_CALLBACK_URL = "http://localhost:5001/api/v1/auth/google/callback";
 
 // Allow DATABASE_URL from .env or fallback to local Auth_db
 process.env.DATABASE_URL =

@@ -1,0 +1,53 @@
+<%- include("../../partials/admin-start") %>
+
+<%
+  const arrow = field => filters.sortBy === field ? (filters.sortOrder === "asc" ? " ↑" : " ↓") : "";
+  const ariaSort = field => filters.sortBy === field ? (filters.sortOrder === "asc" ? "ascending" : "descending") : "none";
+%>
+
+<% if (filters.userId) { %>
+  <p class="notice">
+    Showing logins for one user only.
+    <a href="/admin/login-history">Show everyone</a>
+  </p>
+<% } %>
+
+<% if (loginHistory.length === 0) { %>
+  <p class="empty-state">No login attempts recorded.</p>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th aria-sort="<%= ariaSort('createdAt') %>"><a href="<%= sortUrl('createdAt') %>">When<%= arrow("createdAt") %></a></th>
+          <th>User</th>
+          <th aria-sort="<%= ariaSort('success') %>"><a href="<%= sortUrl('success') %>">Result<%= arrow("success") %></a></th>
+          <th>Reason</th>
+          <th>IP</th>
+          <th>Device</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% loginHistory.forEach(l => { %>
+          <tr>
+            <td><%= formatDate(l.createdAt) %></td>
+            <td>
+              <% if (l.user) { %>
+                <a href="/admin/users/<%= l.user.id %>"><%= l.user.fullName %></a>
+                <span class="muted">@<%= l.user.username %></span>
+              <% } else { %>—<% } %>
+            </td>
+            <td><span class="badge <%= l.success ? 'badge--ok' : 'badge--danger' %>"><%= l.success ? "Success" : "Failed" %></span></td>
+            <td><%= l.reason ?? "—" %></td>
+            <td><%= l.ipAddress %></td>
+            <td class="data-table__details" title="<%= l.userAgent ?? '' %>"><%= l.userAgent ?? "—" %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include("../../partials/pagination") %>
+
+<%- include("../../partials/app-end") %>

@@ -76,15 +76,11 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
     // Teardown: Clean up all database records created during this test suite
     if (testUserIds.size > 0) {
       const ids = Array.from(testUserIds);
-      await prisma.auditLog.deleteMany({
-        where: { userId: { in: ids } },
-      });
+      await prisma.auditLog.deleteMany({ where: { userId: { in: ids } } });
       await prisma.emailVerification.deleteMany({
         where: { userId: { in: ids } },
       });
-      await prisma.user.deleteMany({
-        where: { id: { in: ids } },
-      });
+      await prisma.user.deleteMany({ where: { id: { in: ids } } });
     }
 
     // Disconnect clients to release connection handles
@@ -243,7 +239,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       // Call verification endpoint
       const response = await request(app)
         .post("/api/v1/auth/verify-email")
-        .send({ token: validToken });
+        .send({ email: userData.email, token: validToken });
 
       // 1. Assert HTTP Response
       expect(response.status).toBe(200);
@@ -273,7 +269,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
     it("should reject with 400 Bad Request when an invalid token code is provided", async () => {
       const response = await request(app)
         .post("/api/v1/auth/verify-email")
-        .send({ token: "999999" }); // Non-existent token
+        .send({ email: "nonexistent@example.com", token: "999999" }); // Non-existent token
 
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
@@ -295,16 +291,15 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       testUserIds.add(userId);
 
       // Simulate token expiration by updating the DB row to a past timestamp
-      const tokenHash = tokenUtils.hashToken(expiredToken);
-      await prisma.emailVerification.update({
-        where: { tokenHash },
+      await prisma.emailVerification.updateMany({
+        where: { userId },
         data: { expiresAt: new Date(Date.now() - 1000 * 60 * 10) }, // Expired 10 minutes ago
       });
 
       // Submit expired token
       const response = await request(app)
         .post("/api/v1/auth/verify-email")
-        .send({ token: expiredToken });
+        .send({ email: userData.email, token: expiredToken });
 
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
@@ -331,13 +326,13 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       // First verification: Must succeed
       const firstAttempt = await request(app)
         .post("/api/v1/auth/verify-email")
-        .send({ token: singleUseToken });
+        .send({ email: userData.email, token: singleUseToken });
       expect(firstAttempt.status).toBe(200);
 
       // Second verification with identical token: Must be rejected
       const secondAttempt = await request(app)
         .post("/api/v1/auth/verify-email")
-        .send({ token: singleUseToken });
+        .send({ email: userData.email, token: singleUseToken });
 
       expect(secondAttempt.status).toBe(400);
       expect(secondAttempt.body.success).toBe(false);
@@ -347,12 +342,52 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
     it("should reject with 400 Bad Request when token is malformed (fails Zod schema)", async () => {
       const response = await request(app)
         .post("/api/v1/auth/verify-email")
-        .send({ token: "123" }); // Less than 6 characters
+        .send({ email: "test@example.com", token: "123" }); // Less than 6 characters
 
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe("VALIDATION_ERROR");
       expect(response.body.error.errors[0].field).toBe("token");
+    });
+
+    it("should reject a correct code submitted with a different email", async () => {
+      const victim = generateTestUser("victim");
+      const code = "246810";
+      vi.spyOn(tokenUtils, "verificationToken").mockReturnValue(code);
+      const reg = await request(app).post("/api/v1/auth/register").send(victim);
+      testUserIds.add(reg.body.data.user.id);
+
+      const res = await request(app)
+        .post("/api/v1/auth/verify-email")
+        .send({ email: "attacker@example.com", token: code });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("TOKEN_INVALID");
+      const dbUser = await prisma.user.findUnique({
+        where: { id: reg.body.data.user.id },
+      });
+      expect(dbUser.emailVerified).toBe(false);
+    });
+
+    it("should lock the code after 5 wrong attempts, even if the 6th is correct", async () => {
+      const user = generateTestUser("lock");
+      const code = "135790";
+      vi.spyOn(tokenUtils, "verificationToken").mockReturnValue(code);
+      const reg = await request(app).post("/api/v1/auth/register").send(user);
+      testUserIds.add(reg.body.data.user.id);
+
+      for (let i = 0; i < 5; i++) {
+        await request(app)
+          .post("/api/v1/auth/verify-email")
+          .send({ email: user.email, token: "000000" });
+      }
+
+      const res = await request(app)
+        .post("/api/v1/auth/verify-email")
+        .send({ email: user.email, token: code });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("TOKEN_LOCKED");
     });
   });
 
@@ -396,7 +431,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       // 4. Verify account using the newly issued token
       const verifyRes = await request(app)
         .post("/api/v1/auth/verify-email")
-        .send({ token: newToken });
+        .send({ email: userData.email, token: newToken });
       expect(verifyRes.status).toBe(200);
 
       const dbUser = await prisma.user.findUnique({ where: { id: userId } });
@@ -418,7 +453,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
 
       const verifyRes = await request(app)
         .post("/api/v1/auth/verify-email")
-        .send({ token });
+        .send({ email: userData.email, token });
       expect(verifyRes.status).toBe(200);
 
       // Request resend for already-verified email
@@ -499,7 +534,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       // Verify the user email so they can log in
       const verifyRes = await request(app)
         .post("/api/v1/auth/verify-email")
-        .send({ token: mockToken });
+        .send({ email: userData.email, token: mockToken });
       expect(verifyRes.status).toBe(200);
 
       return { ...userData, id: userId };
@@ -512,10 +547,9 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       it("should successfully log in with email and return token pair (200 OK)", async () => {
         const user = await createVerifiedTestUser("emlogin");
 
-        const response = await request(app).post("/api/v1/auth/login").send({
-          loginIdentifier: user.email,
-          password: user.password,
-        });
+        const response = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: user.password });
 
         // 1. Assert HTTP Response
         expect(response.status).toBe(200);
@@ -550,10 +584,9 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       it("should successfully log in using username as the loginIdentifier (200 OK)", async () => {
         const user = await createVerifiedTestUser("usrlogin");
 
-        const response = await request(app).post("/api/v1/auth/login").send({
-          loginIdentifier: user.username,
-          password: user.password,
-        });
+        const response = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.username, password: user.password });
 
         expect(response.status).toBe(200);
         expect(response.body.success).toBe(true);
@@ -570,10 +603,12 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
         expect(regRes.status).toBe(201);
         testUserIds.add(regRes.body.data.user.id);
 
-        const response = await request(app).post("/api/v1/auth/login").send({
-          loginIdentifier: unverifiedUser.email,
-          password: unverifiedUser.password,
-        });
+        const response = await request(app)
+          .post("/api/v1/auth/login")
+          .send({
+            loginIdentifier: unverifiedUser.email,
+            password: unverifiedUser.password,
+          });
 
         expect(response.status).toBe(401);
         expect(response.body.success).toBe(false);
@@ -589,10 +624,9 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       it("should reject login with 401 Unauthorized on invalid password and increment failedAttempts", async () => {
         const user = await createVerifiedTestUser("badpass");
 
-        const response = await request(app).post("/api/v1/auth/login").send({
-          loginIdentifier: user.email,
-          password: "WrongPassword999!",
-        });
+        const response = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: "WrongPassword999!" });
 
         expect(response.status).toBe(401);
         expect(response.body.success).toBe(false);
@@ -610,10 +644,12 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       });
 
       it("should reject with 401 Unauthorized for non-existent users without timing leaks", async () => {
-        const response = await request(app).post("/api/v1/auth/login").send({
-          loginIdentifier: "non_existent_user_9999@example.com",
-          password: "SomePassword123!",
-        });
+        const response = await request(app)
+          .post("/api/v1/auth/login")
+          .send({
+            loginIdentifier: "non_existent_user_9999@example.com",
+            password: "SomePassword123!",
+          });
 
         expect(response.status).toBe(401);
         expect(response.body.success).toBe(false);
@@ -625,10 +661,9 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
 
         // Perform 4 failed attempts (failedAttempts reaches 4)
         for (let i = 1; i <= 4; i++) {
-          const res = await request(app).post("/api/v1/auth/login").send({
-            loginIdentifier: user.email,
-            password: "WrongPassword!",
-          });
+          const res = await request(app)
+            .post("/api/v1/auth/login")
+            .send({ loginIdentifier: user.email, password: "WrongPassword!" });
           expect(res.status).toBe(401);
         }
 
@@ -639,10 +674,9 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
         expect(midCheck.lockedUntil).toBeNull();
 
         // 5th failed attempt triggers the lockout threshold
-        const lockoutRes = await request(app).post("/api/v1/auth/login").send({
-          loginIdentifier: user.email,
-          password: "WrongPassword!",
-        });
+        const lockoutRes = await request(app)
+          .post("/api/v1/auth/login")
+          .send({ loginIdentifier: user.email, password: "WrongPassword!" });
 
         expect(lockoutRes.status).toBe(401);
         expect(lockoutRes.body.error.message).toContain("temporarily locked");
@@ -666,10 +700,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
         // 6th attempt with the CORRECT password must still be rejected while locked
         const subsequentRes = await request(app)
           .post("/api/v1/auth/login")
-          .send({
-            loginIdentifier: user.email,
-            password: user.password,
-          });
+          .send({ loginIdentifier: user.email, password: user.password });
 
         expect(subsequentRes.status).toBe(401);
         expect(subsequentRes.body.error.message).toContain(
@@ -968,7 +999,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
       // Verify the user email so they can log in
       const verifyRes = await request(app)
         .post("/api/v1/auth/verify-email")
-        .send({ token: mockToken });
+        .send({ email: userData.email, token: mockToken });
       expect(verifyRes.status).toBe(200);
 
       return { ...userData, id: userId };
@@ -1084,10 +1115,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
         const newPassword = "BrandNewSecureP@ssw0rd99!";
         const resetRes = await request(app)
           .post(`/api/v1/auth/reset-password/${mockResetToken}`)
-          .send({
-            newPassword,
-            confirmNewPassword: newPassword,
-          });
+          .send({ newPassword, confirmNewPassword: newPassword });
 
         expect(resetRes.status).toBe(200);
         expect(resetRes.body.success).toBe(true);
@@ -1275,9 +1303,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
         expect(response.body.data.user.fullName).toBe(updatedName);
 
         // Database verification: Name changed, verification remains true
-        const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
-        });
+        const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
         expect(dbUser.fullName).toBe(updatedName);
         expect(dbUser.emailVerified).toBe(true);
       });
@@ -1301,9 +1327,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
         expect(response.body.data.user.emailVerified).toBe(false);
 
         // Database assertions: Email unverified, sessionsRevokedAt set, AuditLog recorded
-        const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
-        });
+        const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
         expect(dbUser.email).toBe(newEmail);
         expect(dbUser.emailVerified).toBe(false);
         expect(dbUser.sessionsRevokedAt).not.toBeNull();
@@ -1415,9 +1439,7 @@ describe("Auth Routes Integration - Registration & Verification Lifecycle", () =
         );
 
         // 3. Database state verifications
-        const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
-        });
+        const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
         expect(dbUser.passwordChangedAt).not.toBeNull();
 
         const revokedToken = await prisma.refreshToken.findFirst({

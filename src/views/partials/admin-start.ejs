@@ -1,0 +1,19 @@
+<%#
+  Shared top of every admin page: the normal app shell + the admin sub-navigation
+  + the error/notice banners. Pages pass `title` and `tab`.
+%>
+<%- include("app-start", { title: `${title} · Admin`, active: "admin" }) %>
+
+<section class="page-head">
+  <h1><%= title %></h1>
+</section>
+
+<nav class="admin-tabs" aria-label="Admin sections">
+  <a href="/admin/users"         aria-current="<%= tab === 'users'       ? 'page' : 'false' %>">Users</a>
+  <a href="/admin/audit-logs"    aria-current="<%= tab === 'audit'       ? 'page' : 'false' %>">Audit log</a>
+  <a href="/admin/login-history" aria-current="<%= tab === 'logins'      ? 'page' : 'false' %>">Login history</a>
+  <a href="/admin/maintenance"   aria-current="<%= tab === 'maintenance' ? 'page' : 'false' %>">Maintenance</a>
+</nav>
+
+<% if (locals.error)  { %><p class="auth-error" role="alert"><%= error %></p><% } %>
+<% if (locals.notice) { %><p class="notice" role="status"><%= notice %></p><% } %>

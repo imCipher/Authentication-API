@@ -23,6 +23,10 @@ router.use(ensureSessionId, doubleCsrfProtection, exposeCsrfToken);
 
 router.get("/login", guestOnly, webController.showLogin);
 router.post("/login", loginRateLimiter, webController.submitLogin);
+// Continue with Google (the callback URL must be registered in Google Cloud Console)
+router.get("/auth/google", guestOnly, authRateLimiter, webController.startGoogle);
+router.get("/auth/google/callback", webController.googleCallback);
+
 router.get("/register", guestOnly, webController.showRegister);
 router.post("/register", registerRateLimiter, webController.submitRegister);
 router.get("/verify-email", guestOnly, webController.showVerifyEmail);

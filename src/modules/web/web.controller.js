@@ -1,7 +1,11 @@
+import passport from "passport";
+
 import CatchAsync from "../../utils/catchasync.js";
 import AuthService from "../auth/auth.service.js";
 import ApiError from "../../utils/ApiError.js";
 import authSchema from "../auth/auth.validation.js";
+import logger from "../../config/logger.js";
+import { isGoogleConfigured } from "../../config/passport.js";
 import { setAuthCookies, clearAuthCookies } from "../../utils/authCookies.js";
 
 const metaOf = req => ({
@@ -28,9 +32,19 @@ const LOGIN_NOTICES = {
   verified: "Email verified! You can now log in.",
 };
 
+// Errors that arrive by redirect (?error=…). Same rule as notices: fixed text
+// from this table only, never the raw query string.
+const LOGIN_ERRORS = {
+  "oauth-cancelled": "Google sign-in was cancelled.",
+  "oauth-failed": "We couldn't sign you in with Google. Please try again.",
+  "oauth-unavailable": "Google sign-in isn't available right now.",
+  "oauth-suspended":
+    "Your account is suspended or deactivated. Please contact support for assistance.",
+};
+
 const showLogin = (req, res) => {
   res.render("pages/login", {
-    error: null,
+    error: LOGIN_ERRORS[req.query.error] ?? null,
     values: {},
     notice: LOGIN_NOTICES[req.query.reason] ?? null,
   });
@@ -72,6 +86,52 @@ const submitLogin = CatchAsync(async (req, res) => {
     throw err;
   }
 });
+
+// ---------------------------------------------------------------------------
+// Continue with Google
+// ---------------------------------------------------------------------------
+
+// Step 1: send the browser to Google (passport adds client_id, scope, state…)
+const startGoogle = (req, res, next) => {
+  if (!isGoogleConfigured) {
+    return res.redirect(303, "/login?error=oauth-unavailable");
+  }
+  return passport.authenticate("google-web", { session: false })(req, res, next);
+};
+
+// Step 2: Google sends the browser back here with ?code=…&state=…
+const googleCallback = (req, res, next) => {
+  if (!isGoogleConfigured) {
+    return res.redirect(303, "/login?error=oauth-unavailable");
+  }
+
+  // The user pressed "Cancel" on Google's consent screen (or Google refused)
+  if (req.query.error) {
+    const reason = req.query.error === "access_denied" ? "oauth-cancelled" : "oauth-failed";
+    return res.redirect(303, `/login?error=${reason}`);
+  }
+
+  // A "custom callback": instead of passport sending its own response, we get
+  // (err, user) back and decide what the page does — cookies + redirect.
+  passport.authenticate("google-web", { session: false }, async (err, user) => {
+    if (err || !user) {
+      // err   → Google/DB problem (logged); !user → state mismatch or similar
+      if (err) logger.warn("Google sign-in failed", { message: err.message });
+      return res.redirect(303, "/login?error=oauth-failed");
+    }
+
+    try {
+      const tokens = await AuthService.oauthLogin(user, metaOf(req));
+      setAuthCookies(res, tokens);
+      return res.redirect(303, "/dashboard");
+    } catch (loginErr) {
+      if (loginErr instanceof ApiError && loginErr.code === "ACCOUNT_SUSPENDED") {
+        return res.redirect(303, "/login?error=oauth-suspended");
+      }
+      return next(loginErr);
+    }
+  })(req, res, next);
+};
 
 const showRegister = (req, res) => {
   res.render("pages/register", { errors: {}, values: {} });
@@ -142,7 +202,7 @@ const renderVerify = (
     .render("pages/verify-email", {
       error,
       email,
-      notice: VERIFY_NOTICES[req.query.sent] ?? null,
+      notice: req.query.sent ? VERIFY_NOTICES.sent : null,
     });
 
 const showVerifyEmail = (req, res) =>
@@ -395,6 +455,8 @@ const logoutAll = CatchAsync(async (req, res) => {
 export default {
   showLogin,
   submitLogin,
+  startGoogle,
+  googleCallback,
   showDashboard,
   showSettings,
   updateProfile,

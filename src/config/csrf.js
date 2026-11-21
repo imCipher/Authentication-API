@@ -10,7 +10,7 @@ export const ensureSessionId = (req, res, next) => {
   if (!req.cookies.sid) {
     const sid = crypto.randomUUID();
     res.cookie("sid", sid, { httpOnly: true, sameSite: "lax", secure: isProd });
-    res.cookies.sid = sid;
+    req.cookies.sid = sid; // make it available to this same request too
   }
   next();
 };

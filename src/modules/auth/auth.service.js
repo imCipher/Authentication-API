@@ -1318,10 +1318,23 @@ class AuthService {
 
     // 2. Link account, mark email verified, and record audit log
     return await prisma.$transaction(async tx => {
+      // Pre-hijacking protection: if this account's email was NEVER verified,
+      // whoever set its password never proved they own the email. Now that the
+      // provider has proven ownership, that password must not keep working.
+      const before = await tx.user.findUnique({
+        where: { id: userId },
+        select: { emailVerified: true, passwordHash: true },
+      });
+      const clearUnprovenPassword = Boolean(
+        before && !before.emailVerified && before.passwordHash,
+      );
+
       const updatedUser = await tx.user.update({
         where: { id: userId },
         data: {
           emailVerified: true,
+          // (no session revoke needed: unverified accounts can't log in, so they have none)
+          ...(clearUnprovenPassword && { passwordHash: null }),
           oauthAccounts: {
             create: {
               provider: normalizedProvider,
@@ -1339,6 +1352,7 @@ class AuthService {
           details: {
             provider: normalizedProvider,
             providerUserId: String(providerUserId),
+            unverifiedPasswordCleared: clearUnprovenPassword,
           },
           ipAddress: metadata?.userIp || null,
           userAgent: metadata?.userAgent || null,
@@ -1443,7 +1457,7 @@ class AuthService {
 
     // Generate access and refresh tokens for the user
     const accessToken = await this.generateAccessToken({
-      userId: user.id,
+      id: user.id,
       role: user.role,
     });
     const { refreshToken } = await this.generateRefreshToken(user.id, metadata);

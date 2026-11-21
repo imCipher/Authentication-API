@@ -2,13 +2,7 @@ import winston from "winston";
 import finalConfig from "./keys.js";
 
 // Define Custom log levels
-const levels = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  http: 3,
-  debug: 4,
-};
+const levels = { error: 0, warn: 1, info: 2, http: 3, debug: 4 };
 
 // Define different log level based on environment
 const getLevel = () => {
@@ -71,9 +65,10 @@ const consoleFormat = winston.format.combine(
       const picked = Object.fromEntries(keys.map(k => [k, meta[k]]));
       let rendered;
       try {
-        rendered = JSON.stringify(picked, (_k, v) =>{
-          if (typeof v === "bigint") v.toString(); // Convert BigInt to string for JSON serialization
-          if (v instanceof Error) return { name: v.name, message: v.message, stack: v.stack }; // Serialize Error objects
+        rendered = JSON.stringify(picked, (_k, v) => {
+          if (typeof v === "bigint") return v.toString(); // Convert BigInt to string for JSON serialization
+          if (v instanceof Error)
+            return { name: v.name, message: v.message, stack: v.stack }; // Serialize Error objects
           return v;
         });
       } catch {
@@ -103,9 +98,7 @@ const logger = winston.createLogger({
   ),
   transports: [
     // Console only transport
-    new winston.transports.Console({
-      format: consoleFormat,
-    }),
+    new winston.transports.Console({ format: consoleFormat }),
   ],
   // Don't exit on uncaught exception
   exitOnError: false,

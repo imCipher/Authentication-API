@@ -87,7 +87,7 @@ const config = {
     fullName: process.env.ADMIN_FULL_NAME || "Super Administrator",
     email: process.env.ADMIN_EMAIL || "admin@example.com",
     username: process.env.ADMIN_USERNAME || "admin",
-    password: process.env.ADMIN_PASSWORD || "Admin@12345",
+    password: process.env.ADMIN_PASSWORD,
   },
 
   // CSRF
@@ -117,7 +117,7 @@ export const validateConfig = () => {
     );
   }
 
-  if (!/^[0-9]$/.test(String(config.jwt.refreshExpiresIn))) {
+  if (!/^[0-9]+$/.test(String(config.jwt.refreshExpiresIn))) {
     throw new Error(
       `JWT_REFRESH_EXPIRES_IN must be a number (e.g. "7"), got "${config.jwt.refreshExpiresIn}"`,
     );
@@ -132,6 +132,12 @@ export const validateConfig = () => {
   if (!/^\d+(ms|s|m|h|d)$/.test(String(config.jwt.accessExpiresIn))) {
     throw new Error(
       `JWT_ACCESS_EXPIRES_IN must include a unit (e.g. "15m"), got "${config.jwt.accessExpiresIn}"`,
+    );
+  }
+
+  if (!config.adminSeed.password || config.adminSeed.password.length < 8) {
+    throw new Error(
+      "ADMIN_PASSWORD is not set or is too short. The default admin account cannot be created.",
     );
   }
 

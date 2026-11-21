@@ -91,7 +91,7 @@ describe("Email Utility", () => {
           firstName: "Johnathan",
           code: "123456",
           subject: "Confirm your email address",
-          url: "http://localhost:3000/reset-password/undefined",
+          url: "http://localhost:5001/reset-password/undefined",
         }),
       );
 

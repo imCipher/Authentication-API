@@ -17,7 +17,7 @@ import healthRoutes from "./modules/health/health.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
 
-import "./config/passport.js"; // Import Passport configuration
+import { isGoogleConfigured } from "./config/passport.js"; // Registers the Passport strategies
 
 // Initialize Express App
 const app = express();
@@ -38,6 +38,8 @@ app.locals.formatDate = d =>
       timeStyle: "short",
     }).format(new Date(d))
   : "—";
+
+app.locals.googleEnabled = isGoogleConfigured; // templates only show the Google button when it can work
 
 app.set("views", path.join(import.meta.dirname, "views")); // -> src/views
 app.use(express.static(path.join(import.meta.dirname, "..", "public"))); // Serve static files from the public directory
@@ -65,7 +67,7 @@ const apiPrefix = `/api/${finalConfig.apiVersion}`;
 app.use(`${apiPrefix}/health`, healthRoutes);
 app.use(`${apiPrefix}/auth`, authRoutes);
 app.use(`${apiPrefix}/admin`, adminRoutes);
-if (finalConfig.nodeEnv !== "production") {
+if (finalConfig.env !== "production") {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 }
 

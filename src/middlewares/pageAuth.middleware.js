@@ -1,5 +1,6 @@
 import { protect } from "./auth.middleware.js";
 import AuthService from "../modules/auth/auth.service.js";
+import ApiError from "../utils/ApiError.js";
 import { setAuthCookies, clearAuthCookies } from "../utils/authCookies.js";
 
 // protect() reports its result by calling next(err). Wrap it so we can await it:
@@ -38,6 +39,24 @@ export const requireAuthPage = async (req, res, next) => {
   clearAuthCookies(res);
   return res.redirect(303, "/login");
 };
+
+// Admin pages: must be logged in (guests → /login) AND have the ADMIN role
+// (logged-in non-admins → the 403 "Access denied" page).
+// The role comes from the database via protect() → getUserById, not from the
+// token alone, so a demoted admin loses access on their very next request.
+export const requireAdminPage = [
+  requireAuthPage,
+  (req, res, next) => {
+    if (req.user?.role !== "ADMIN") {
+      return next(
+        ApiError.forbidden("You do not have permission to view this page.", {
+          code: "FORBIDDEN",
+        }),
+      );
+    }
+    next();
+  },
+];
 
 // the opposite: logged-in users shouldn't see /login again
 export const guestOnly = async (req, res, next) => {

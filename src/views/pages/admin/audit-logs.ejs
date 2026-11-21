@@ -1,0 +1,86 @@
+<%- include("../../partials/admin-start") %>
+
+<%
+  const arrow = field => filters.sortBy === field ? (filters.sortOrder === "asc" ? " ↑" : " ↓") : "";
+  const ariaSort = field => filters.sortBy === field ? (filters.sortOrder === "asc" ? "ascending" : "descending") : "none";
+  // readable one-line summary of the JSON `details` column
+  const summary = d => {
+    if (!d) return "—";
+    if (d.message) return d.message;
+    if (d.newRole) return `Role ${d.previousRole} → ${d.newRole}`;
+    if (d.newStatus) return `Status ${d.previousStatus} → ${d.newStatus}`;
+    return JSON.stringify(d);
+  };
+%>
+
+<form method="get" action="/admin/audit-logs" class="filters" role="search">
+  <label class="filters__field filters__field--grow">
+    <span>Search</span>
+    <input type="search" name="search" value="<%= filters.search ?? '' %>" placeholder="User, email, IP, or a user/log ID" maxlength="100">
+  </label>
+
+  <label class="filters__field">
+    <span>Action</span>
+    <select name="action">
+      <option value="">Any action</option>
+      <% actions.forEach(a => { %>
+        <option value="<%= a %>" <%= filters.action === a ? "selected" : "" %>><%= a %></option>
+      <% }) %>
+    </select>
+  </label>
+
+  <input type="hidden" name="sortBy" value="<%= filters.sortBy %>">
+  <input type="hidden" name="sortOrder" value="<%= filters.sortOrder %>">
+
+  <div class="filters__actions">
+    <button type="submit" class="btn-primary btn-small">Apply</button>
+    <a href="/admin/audit-logs" class="btn-ghost">Reset</a>
+  </div>
+</form>
+
+<% if (auditLogs.length === 0) { %>
+  <p class="empty-state">No audit entries match these filters.</p>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th aria-sort="<%= ariaSort('createdAt') %>"><a href="<%= sortUrl('createdAt') %>">When<%= arrow("createdAt") %></a></th>
+          <th aria-sort="<%= ariaSort('action') %>"><a href="<%= sortUrl('action') %>">Action<%= arrow("action") %></a></th>
+          <th>Performed by</th>
+          <th>Details</th>
+          <th>IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% auditLogs.forEach(log => { %>
+          <tr>
+            <td><%= formatDate(log.createdAt) %></td>
+            <td>
+              <span class="badge <%= log.success === false ? 'badge--danger' : 'badge--muted' %>"><%= log.action %></span>
+            </td>
+            <td>
+              <% if (log.user) { %>
+                <a href="/admin/users/<%= log.user.id %>"><%= log.user.fullName %></a>
+                <span class="muted">@<%= log.user.username %></span>
+              <% } else { %>
+                <span class="muted">Deleted user</span>
+              <% } %>
+            </td>
+            <td class="data-table__details">
+              <%= summary(log.details) %>
+              <% if (log.details?.targetUserId) { %>
+                <br><a href="/admin/users/<%= log.details.targetUserId %>" class="muted">target user →</a>
+              <% } %>
+            </td>
+            <td><%= log.ipAddress ?? "—" %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include("../../partials/pagination") %>
+
+<%- include("../../partials/app-end") %>

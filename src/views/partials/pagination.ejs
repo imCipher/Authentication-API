@@ -1,0 +1,35 @@
+<%#
+  Page links for any admin table. Needs `pagination` (from AdminService) and
+  `pageUrl(n)` (from the controller, keeps the current filters).
+%>
+<% if (pagination.totalPages > 1) { %>
+  <%
+    const current = pagination.currentPage;
+    const last = pagination.totalPages;
+    // show the first, the last, and two pages either side of the current one
+    const pages = [...new Set([1, current - 2, current - 1, current, current + 1, current + 2, last])]
+      .filter(n => n >= 1 && n <= last)
+      .sort((a, b) => a - b);
+  %>
+  <nav class="pagination" aria-label="Pagination">
+    <% if (pagination.hasPrevPage) { %>
+      <a href="<%= pageUrl(current - 1) %>" rel="prev">← Previous</a>
+    <% } %>
+
+    <% pages.forEach((n, i) => { %>
+      <% if (i > 0 && n - pages[i - 1] > 1) { %><span class="pagination__gap">…</span><% } %>
+      <% if (n === current) { %>
+        <span aria-current="page"><%= n %></span>
+      <% } else { %>
+        <a href="<%= pageUrl(n) %>"><%= n %></a>
+      <% } %>
+    <% }) %>
+
+    <% if (pagination.hasNextPage) { %>
+      <a href="<%= pageUrl(current + 1) %>" rel="next">Next →</a>
+    <% } %>
+  </nav>
+<% } %>
+<p class="muted table-count">
+  <%= pagination.totalCount %> result<%= pagination.totalCount === 1 ? "" : "s" %>
+</p>

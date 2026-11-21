@@ -16,12 +16,10 @@ const signAccessToken = ({ id, role }) => {
       sub: id,
       role,
       jti: crypto.randomUUID(),
+      iatMs: Date.now(), // exact issue time; the standard `iat` is only whole seconds
     },
     finalConfig.jwt.accessSecret,
-    {
-      expiresIn: finalConfig.jwt.accessExpiresIn,
-      algorithm: "HS256",
-    },
+    { expiresIn: finalConfig.jwt.accessExpiresIn, algorithm: "HS256" },
   );
 };
 

@@ -46,9 +46,7 @@ export const protect = CatchAsync(async (req, res, next) => {
     return next(
       ApiError.unauthorized(
         "This token has been revoked. Please log in again.",
-        {
-          code: "TOKEN_REVOKED",
-        },
+        { code: "TOKEN_REVOKED" },
       ),
     );
   }
@@ -65,9 +63,13 @@ export const protect = CatchAsync(async (req, res, next) => {
     );
   }
 
+  // Exact issue time in ms. Tokens signed before this change only have `iat`
+  // (seconds) — they fall back to it and expire within 15 minutes anyway.
+  const issuedAtMs = decoded.iatMs ?? decoded.iat * 1000;
+
   // Check if the user has changed their password after the token was issued
   if (currentUser.passwordChangedAt) {
-    if (decoded.iat < currentUser.passwordChangedAt.getTime() / 1000) {
+    if (issuedAtMs < currentUser.passwordChangedAt.getTime()) {
       return next(
         ApiError.unauthorized(
           "You have recently changed your password. Please log in again.",
@@ -78,7 +80,7 @@ export const protect = CatchAsync(async (req, res, next) => {
 
   // Check if the user has revoked all sessions after the token was issued
   if (currentUser.sessionsRevokedAt) {
-    if (decoded.iat < currentUser.sessionsRevokedAt.getTime() / 1000) {
+    if (issuedAtMs < currentUser.sessionsRevokedAt.getTime()) {
       return next(
         ApiError.unauthorized(
           "You have logged out from all sessions. Please log in again.",

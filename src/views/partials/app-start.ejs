@@ -8,6 +8,9 @@
     <nav class="app-nav__links" aria-label="Main">
       <a href="/dashboard" aria-current="<%= locals.active === 'dashboard' ? 'page' : 'false' %>">Dashboard</a>
       <a href="/settings"  aria-current="<%= locals.active === 'settings'  ? 'page' : 'false' %>">Settings</a>
+      <% if (locals.user?.role === "ADMIN") { %>
+        <a href="/admin/users" aria-current="<%= locals.active === 'admin' ? 'page' : 'false' %>">Admin</a>
+      <% } %>
     </nav>
 
     <form method="post" action="/logout">

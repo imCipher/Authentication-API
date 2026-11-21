@@ -36,26 +36,39 @@
   <!-- Password -->
   <section class="card">
     <h2>Password</h2>
-    <p class="muted">Changing your password logs you out on every device.</p>
-    <% if (errors.password) { %><p class="auth-error" role="alert"><%= errors.password %></p><% } %>
 
-    <form method="post" action="/settings/password" class="auth-form">
-      <%- include("../partials/csrf") %>
-      <div class="field">
-        <input type="password" id="currentPassword" name="currentPassword" autocomplete="current-password" placeholder=" " required>
-        <label for="currentPassword">Current password</label>
-      </div>
-      <div class="field">
-        <input type="password" id="newPassword" name="newPassword" autocomplete="new-password" placeholder=" " required>
-        <label for="newPassword">New password</label>
-      </div>
-      <div class="field">
-        <input type="password" id="confirmNewPassword" name="confirmNewPassword" autocomplete="new-password" placeholder=" " required>
-        <label for="confirmNewPassword">Confirm new password</label>
-      </div>
-      <button type="submit" class="btn-primary">Change password</button>
-    </form>
+    <% if (hasPassword) { %>
+      <p class="muted">Changing your password logs you out on every device.</p>
+      <% if (errors.password) { %><p class="auth-error" role="alert"><%= errors.password %></p><% } %>
+            <form method="post" action="/settings/password" class="auth-form">
+        <%- include("../partials/csrf") %>
+        <div class="field">
+          <input type="password" id="currentPassword" name="currentPassword" autocomplete="current-password" placeholder=" " required>
+          <label for="currentPassword">Current password</label>
+        </div>
+        <div class="field">
+          <input type="password" id="newPassword" name="newPassword" autocomplete="new-password" placeholder=" " required>
+          <label for="newPassword">New password</label>
+        </div>
+        <div class="field">
+          <input type="password" id="confirmNewPassword" name="confirmNewPassword" autocomplete="new-password" placeholder=" " required>
+          <label for="confirmNewPassword">Confirm new password</label>
+        </div>
+        <button type="submit" class="btn-primary">Change password</button>
+      </form>
+
+    <% } else { %>
+      <p class="muted">
+        You signed in with Google, so this account doesn't have a password yet.
+        Set one if you'd also like to log in with your email.
+      </p>
+      <form method="post" action="/settings/password-link">
+        <%- include("../partials/csrf") %>
+        <button type="submit" class="btn-primary">Email me a link to set a password</button>
+      </form>
+    <% } %>
   </section>
+
 
   <!-- Sessions -->
   <section class="card">

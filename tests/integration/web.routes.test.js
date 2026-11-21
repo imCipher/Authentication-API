@@ -72,12 +72,17 @@ const getToken = async (agent, path) => {
 const cookieLine = (res, name) =>
   (res.headers["set-cookie"] ?? []).find(c => c.startsWith(`${name}=`));
 const cookieValue = (res, name) =>
-  cookieLine(res, name)?.split(";")[0].slice(name.length + 1);
+  cookieLine(res, name)
+    ?.split(";")[0]
+    .slice(name.length + 1);
 
 // Submit the real login form with an agent; returns the response (doesn't assert)
 const submitLogin = async (agent, loginIdentifier, password = PASSWORD) => {
   const _csrf = await getToken(agent, "/login");
-  return agent.post("/login").type("form").send({ _csrf, loginIdentifier, password });
+  return agent
+    .post("/login")
+    .type("form")
+    .send({ _csrf, loginIdentifier, password });
 };
 
 // Log an agent in and assert it worked
@@ -204,7 +209,11 @@ describe("Web pages (server-rendered)", () => {
         .post("/login")
         .type("form")
         .set(HTML)
-        .send({ _csrf: tampered, loginIdentifier: "someone@example.com", password: PASSWORD });
+        .send({
+          _csrf: tampered,
+          loginIdentifier: "someone@example.com",
+          password: PASSWORD,
+        });
 
       expect(res.status).toBe(403);
     });
@@ -219,7 +228,11 @@ describe("Web pages (server-rendered)", () => {
         .post("/login")
         .type("form")
         .set(HTML)
-        .send({ _csrf: alicesToken, loginIdentifier: "someone@example.com", password: PASSWORD });
+        .send({
+          _csrf: alicesToken,
+          loginIdentifier: "someone@example.com",
+          password: PASSWORD,
+        });
 
       expect(res.status).toBe(403); // tokens are tied to the sid → can't be reused elsewhere
     });
@@ -233,7 +246,11 @@ describe("Web pages (server-rendered)", () => {
         .post("/login")
         .type("form")
         .set(HTML)
-        .send({ _csrf: token, loginIdentifier: "someone@example.com", password: PASSWORD });
+        .send({
+          _csrf: token,
+          loginIdentifier: "someone@example.com",
+          password: PASSWORD,
+        });
 
       expect(res.status).toBe(403);
     });
@@ -325,12 +342,15 @@ describe("Web pages (server-rendered)", () => {
 
   // -----------------------------------------------------------------------
   describe("Page protection", () => {
-    it.each(["/dashboard", "/settings"])("redirects guests from %s to /login", async path => {
-      const res = await request(app).get(path).set(HTML);
+    it.each(["/dashboard", "/settings"])(
+      "redirects guests from %s to /login",
+      async path => {
+        const res = await request(app).get(path).set(HTML);
 
-      expect(res.status).toBe(303);
-      expect(res.headers.location).toBe("/login");
-    });
+        expect(res.status).toBe(303);
+        expect(res.headers.location).toBe("/login");
+      },
+    );
 
     it.each(["/login", "/register", "/forgot-password"])(
       "redirects logged-in users away from %s",
@@ -370,7 +390,9 @@ describe("Web pages (server-rendered)", () => {
 
       expect(res.status).toBe(303);
       expect(res.headers.location).toBe("/login");
-      expect(cookieLine(res, "refreshToken")).toMatch(/Expires=Thu, 01 Jan 1970/); // cleared
+      expect(cookieLine(res, "refreshToken")).toMatch(
+        /Expires=Thu, 01 Jan 1970/,
+      ); // cleared
     });
 
     it("sends a garbage access cookie (and no refresh cookie) to /login", async () => {
@@ -435,7 +457,10 @@ describe("Web pages (server-rendered)", () => {
       const _csrf = await getToken(agent, "/register");
       const data = { ...uniqueUser("dup"), username: existing.username };
 
-      const res = await agent.post("/register").type("form").send({ _csrf, ...data });
+      const res = await agent
+        .post("/register")
+        .type("form")
+        .send({ _csrf, ...data });
 
       expect(res.status).toBe(409);
       expect(res.text).toContain("Username is already taken");
@@ -447,7 +472,10 @@ describe("Web pages (server-rendered)", () => {
       const _csrf = await getToken(agent, "/register");
       const data = { ...uniqueUser("dupmail"), email: existing.email };
 
-      const res = await agent.post("/register").type("form").send({ _csrf, ...data });
+      const res = await agent
+        .post("/register")
+        .type("form")
+        .send({ _csrf, ...data });
 
       expect(res.status).toBe(409);
       expect(res.text).toContain("Email is already registered");
@@ -461,17 +489,27 @@ describe("Web pages (server-rendered)", () => {
       const first = await agent
         .post("/register")
         .type("form")
-        .send({ _csrf, ...data, username: `  ${data.username.toUpperCase()} ` });
+        .send({
+          _csrf,
+          ...data,
+          username: `  ${data.username.toUpperCase()} `,
+        });
       expect(first.status).toBe(303);
 
-      const saved = await prisma.user.findUnique({ where: { email: data.email } });
+      const saved = await prisma.user.findUnique({
+        where: { email: data.email },
+      });
       expect(saved.username).toBe(data.username); // stored trimmed + lowercase
 
       _csrf = await getToken(agent, "/register");
       const second = await agent
         .post("/register")
         .type("form")
-        .send({ _csrf, ...uniqueUser("case2"), username: data.username.toUpperCase() });
+        .send({
+          _csrf,
+          ...uniqueUser("case2"),
+          username: data.username.toUpperCase(),
+        });
       expect(second.status).toBe(409);
     });
 
@@ -480,12 +518,19 @@ describe("Web pages (server-rendered)", () => {
       const _csrf = await getToken(agent, "/register");
       const data = uniqueUser("reg");
 
-      const res = await agent.post("/register").type("form").send({ _csrf, ...data });
+      const res = await agent
+        .post("/register")
+        .type("form")
+        .send({ _csrf, ...data });
 
       expect(res.status).toBe(303);
-      expect(res.headers.location).toBe(`/verify-email?email=${encodeURIComponent(data.email)}`);
+      expect(res.headers.location).toBe(
+        `/verify-email?email=${encodeURIComponent(data.email)}`,
+      );
 
-      const dbUser = await prisma.user.findUnique({ where: { email: data.email } });
+      const dbUser = await prisma.user.findUnique({
+        where: { email: data.email },
+      });
       expect(dbUser).not.toBeNull();
       expect(dbUser.emailVerified).toBe(false);
     });
@@ -498,22 +543,30 @@ describe("Web pages (server-rendered)", () => {
       vi.spyOn(tokenUtils, "verificationToken").mockReturnValue(code);
       const data = uniqueUser("ver");
       const _csrf = await getToken(agent, "/register");
-      const res = await agent.post("/register").type("form").send({ _csrf, ...data });
+      const res = await agent
+        .post("/register")
+        .type("form")
+        .send({ _csrf, ...data });
       expect(res.status).toBe(303);
       return data;
     };
 
-    const verifyPage = email => `/verify-email?email=${encodeURIComponent(email)}`;
+    const verifyPage = email =>
+      `/verify-email?email=${encodeURIComponent(email)}`;
 
     it("shows the email from the URL when it is valid", async () => {
-      const res = await request(app).get(verifyPage("someone@example.com")).set(HTML);
+      const res = await request(app)
+        .get(verifyPage("someone@example.com"))
+        .set(HTML);
 
       expect(res.text).toContain("someone@example.com");
       expect(res.text).not.toContain('id="verifyEmail"'); // no email box needed
     });
 
     it("ignores an invalid ?email= value and asks for the email instead", async () => {
-      const res = await request(app).get("/verify-email?email=hello world").set(HTML);
+      const res = await request(app)
+        .get("/verify-email?email=hello world")
+        .set(HTML);
 
       expect(res.status).toBe(200);
       expect(res.text).not.toContain("hello world");
@@ -532,7 +585,9 @@ describe("Web pages (server-rendered)", () => {
 
       expect(res.status).toBe(303);
       expect(res.headers.location).toBe("/login?reason=verified");
-      const dbUser = await prisma.user.findUnique({ where: { email: data.email } });
+      const dbUser = await prisma.user.findUnique({
+        where: { email: data.email },
+      });
       expect(dbUser.emailVerified).toBe(true);
     });
 
@@ -576,7 +631,9 @@ describe("Web pages (server-rendered)", () => {
         .send({ _csrf, email: "attacker@example.com", token: "777888" });
 
       expect(res.status).toBe(400);
-      const dbUser = await prisma.user.findUnique({ where: { email: victim.email } });
+      const dbUser = await prisma.user.findUnique({
+        where: { email: victim.email },
+      });
       expect(dbUser.emailVerified).toBe(false);
     });
 
@@ -596,15 +653,23 @@ describe("Web pages (server-rendered)", () => {
     it("resend redirects back with the 'sent' notice (same for any email)", async () => {
       const agent = request.agent(app);
 
-      for (const email of ["nobody-here@example.com", "another-nobody@example.com"]) {
+      for (const email of [
+        "nobody-here@example.com",
+        "another-nobody@example.com",
+      ]) {
         const _csrf = await getToken(agent, verifyPage(email));
-        const res = await agent.post("/verify-email/resend").type("form").send({ _csrf, email });
+        const res = await agent
+          .post("/verify-email/resend")
+          .type("form")
+          .send({ _csrf, email });
 
         expect(res.status).toBe(303);
         expect(res.headers.location).toBe(`${verifyPage(email)}&sent=1`);
       }
 
-      const page = await agent.get(`${verifyPage("nobody-here@example.com")}&sent=1`).set(HTML);
+      const page = await agent
+        .get(`${verifyPage("nobody-here@example.com")}&sent=1`)
+        .set(HTML);
       expect(page.text).toContain("a new code is on its way");
     });
 
@@ -631,7 +696,12 @@ describe("Web pages (server-rendered)", () => {
       const responses = [];
       for (const email of [user.email, "no-such-account@example.com"]) {
         const _csrf = await getToken(agent, "/forgot-password");
-        responses.push(await agent.post("/forgot-password").type("form").send({ _csrf, email }));
+        responses.push(
+          await agent
+            .post("/forgot-password")
+            .type("form")
+            .send({ _csrf, email }),
+        );
       }
 
       for (const res of responses) {
@@ -666,9 +736,14 @@ describe("Web pages (server-rendered)", () => {
       const agent = request.agent(app);
       const _csrf = await getToken(agent, "/forgot-password");
 
-      await agent.post("/forgot-password").type("form").send({ _csrf, email: user.email });
+      await agent
+        .post("/forgot-password")
+        .type("form")
+        .send({ _csrf, email: user.email });
 
-      const resets = await prisma.passwordReset.findMany({ where: { userId: user.id } });
+      const resets = await prisma.passwordReset.findMany({
+        where: { userId: user.id },
+      });
       expect(resets).toHaveLength(1);
     });
   });
@@ -679,15 +754,25 @@ describe("Web pages (server-rendered)", () => {
     const requestReset = async (agent, user, token) => {
       vi.spyOn(tokenUtils, "secureToken").mockReturnValue(token);
       const _csrf = await getToken(agent, "/forgot-password");
-      const res = await agent.post("/forgot-password").type("form").send({ _csrf, email: user.email });
+      const res = await agent
+        .post("/forgot-password")
+        .type("form")
+        .send({ _csrf, email: user.email });
       expect(res.status).toBe(303);
       return token;
     };
 
     const uniqueToken = () =>
-      (Date.now().toString(16) + Math.random().toString(16).slice(2)).padEnd(64, "0").slice(0, 64);
+      (Date.now().toString(16) + Math.random().toString(16).slice(2))
+        .padEnd(64, "0")
+        .slice(0, 64);
 
-    const submitReset = async (agent, token, newPassword, confirmNewPassword = newPassword) => {
+    const submitReset = async (
+      agent,
+      token,
+      newPassword,
+      confirmNewPassword = newPassword,
+    ) => {
       const _csrf = await getToken(agent, `/reset-password/${token}`);
       return agent
         .post(`/reset-password/${token}`)
@@ -708,7 +793,11 @@ describe("Web pages (server-rendered)", () => {
       const oldPw = await submitLogin(request.agent(app), user.email, PASSWORD);
       expect(oldPw.status).toBe(401);
 
-      const newPw = await submitLogin(request.agent(app), user.email, NEW_PASSWORD);
+      const newPw = await submitLogin(
+        request.agent(app),
+        user.email,
+        NEW_PASSWORD,
+      );
       expect(newPw.status).toBe(303);
       expect(newPw.headers.location).toBe("/dashboard");
     });
@@ -723,13 +812,19 @@ describe("Web pages (server-rendered)", () => {
 
       const second = await submitReset(agent, token, "YetAnotherP@ssw0rd789!");
       expect(second.status).toBe(400);
-      expect(second.text).toContain("This reset link is invalid or has expired.");
+      expect(second.text).toContain(
+        "This reset link is invalid or has expired.",
+      );
       expect(second.text).not.toContain('action="/reset-password'); // no form for a dead link
       expect(second.text).toContain('href="/forgot-password"');
     });
 
     it("an unknown (well-formed) token shows the expired state, not the form", async () => {
-      const res = await submitReset(request.agent(app), "f".repeat(64), NEW_PASSWORD);
+      const res = await submitReset(
+        request.agent(app),
+        "f".repeat(64),
+        NEW_PASSWORD,
+      );
 
       expect(res.status).toBe(400);
       expect(res.text).toContain("This reset link is invalid or has expired.");
@@ -763,7 +858,12 @@ describe("Web pages (server-rendered)", () => {
       const agent = request.agent(app);
       const token = await requestReset(agent, user, uniqueToken());
 
-      const res = await submitReset(agent, token, NEW_PASSWORD, "Different1!Pass");
+      const res = await submitReset(
+        agent,
+        token,
+        NEW_PASSWORD,
+        "Different1!Pass",
+      );
 
       expect(res.status).toBe(422);
       expect(res.text).toContain('id="confirmNewPassword-error"');
@@ -802,8 +902,23 @@ describe("Web pages (server-rendered)", () => {
   describe("Settings", () => {
     const postSettings = async (agent, path, body) => {
       const _csrf = await getToken(agent, "/settings");
-      return agent.post(path).type("form").send({ _csrf, ...body });
+      return agent
+        .post(path)
+        .type("form")
+        .send({ _csrf, ...body });
     };
+
+    it("a user with a password sees the change-password form (not 'set a password')", async () => {
+      const user = await createVerifiedUser("setform");
+      const agent = request.agent(app);
+      await loginAs(agent, user);
+
+      const res = await agent.get("/settings").set(HTML);
+
+      expect(res.text).toContain('action="/settings/password"');
+      expect(res.text).toContain('name="currentPassword"');
+      expect(res.text).not.toContain('action="/settings/password-link"');
+    });
 
     it("shows the current profile values", async () => {
       const user = await createVerifiedUser("setshow");
@@ -904,7 +1019,11 @@ describe("Web pages (server-rendered)", () => {
       expect(dash.status).toBe(303);
       expect(dash.headers.location).toBe("/login");
 
-      const relogin = await submitLogin(request.agent(app), user.email, NEW_PASSWORD);
+      const relogin = await submitLogin(
+        request.agent(app),
+        user.email,
+        NEW_PASSWORD,
+      );
       expect(relogin.status).toBe(303);
     });
 
@@ -926,6 +1045,23 @@ describe("Web pages (server-rendered)", () => {
         expect(dash.headers.location).toBe("/login");
       }
     });
+
+    it("logging in right after a password change works immediately (no same-second bug)", async () => {
+      const user = await createVerifiedUser("samesec");
+      const agent = request.agent(app);
+      await loginAs(agent, user);
+      await postSettings(agent, "/settings/password", {
+        currentPassword: PASSWORD,
+        newPassword: NEW_PASSWORD,
+        confirmNewPassword: NEW_PASSWORD,
+      });
+
+      const fresh = request.agent(app);
+      await loginAs(fresh, user, NEW_PASSWORD);
+      const dash = await fresh.get("/dashboard").set(HTML);
+
+      expect(dash.status).toBe(200);
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -940,7 +1076,9 @@ describe("Web pages (server-rendered)", () => {
 
       expect(res.status).toBe(303);
       expect(res.headers.location).toBe("/login?reason=logged-out");
-      expect(cookieLine(res, "accessToken")).toMatch(/Expires=Thu, 01 Jan 1970/);
+      expect(cookieLine(res, "accessToken")).toMatch(
+        /Expires=Thu, 01 Jan 1970/,
+      );
 
       const after = await agent.get("/dashboard").set(HTML);
       expect(after.status).toBe(303);
@@ -974,14 +1112,19 @@ describe("Web pages (server-rendered)", () => {
     // the state check, finding/linking/creating the user, cookies, redirects — is real.
     const fakeGoogle = profile => {
       vi.spyOn(strategy()._oauth2, "getOAuthAccessToken").mockImplementation(
-        (code, params, callback) => callback(null, "fake-google-access", "fake-google-refresh", {}),
+        (code, params, callback) =>
+          callback(null, "fake-google-access", "fake-google-refresh", {}),
       );
-      vi.spyOn(strategy(), "userProfile").mockImplementation((accessToken, done) =>
-        done(null, profile),
+      vi.spyOn(strategy(), "userProfile").mockImplementation(
+        (accessToken, done) => done(null, profile),
       );
     };
 
-    const googleProfile = ({ email, verified = true, name = "Google Person" }) => ({
+    const googleProfile = ({
+      email,
+      verified = true,
+      name = "Google Person",
+    }) => ({
       provider: "google",
       id: `g-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       displayName: name,
@@ -998,14 +1141,19 @@ describe("Web pages (server-rendered)", () => {
     };
 
     const finishFlow = (agent, state) =>
-      agent.get(`/auth/google/callback?code=fake-code&state=${state}`).set(HTML);
+      agent
+        .get(`/auth/google/callback?code=fake-code&state=${state}`)
+        .set(HTML);
 
-    it.each(["/login", "/register"])("%s shows the 'Continue with Google' button", async path => {
-      const res = await request(app).get(path).set(HTML);
+    it.each(["/login", "/register"])(
+      "%s shows the 'Continue with Google' button",
+      async path => {
+        const res = await request(app).get(path).set(HTML);
 
-      expect(res.text).toContain('href="/auth/google"');
-      expect(res.text).toContain("Continue with Google");
-    });
+        expect(res.text).toContain('href="/auth/google"');
+        expect(res.text).toContain("Continue with Google");
+      },
+    );
 
     it("GET /auth/google redirects to Google with our client, callback, scope and a state", async () => {
       const res = await request(app).get("/auth/google").set(HTML);
@@ -1013,7 +1161,9 @@ describe("Web pages (server-rendered)", () => {
       expect(res.status).toBe(302);
       const url = new URL(res.headers.location);
       expect(url.hostname).toBe("accounts.google.com");
-      expect(url.searchParams.get("client_id")).toBe(process.env.GOOGLE_CLIENT_ID);
+      expect(url.searchParams.get("client_id")).toBe(
+        process.env.GOOGLE_CLIENT_ID,
+      );
       expect(url.searchParams.get("redirect_uri")).toBe(
         `${process.env.APP_URL}/auth/google/callback`,
       );
@@ -1085,10 +1235,16 @@ describe("Web pages (server-rendered)", () => {
       const res = await finishFlow(agent, await startFlow(agent));
 
       expect(res.headers.location).toBe("/dashboard");
-      const links = await prisma.oauthAccount.findMany({ where: { userId: user.id } });
+      const links = await prisma.oauthAccount.findMany({
+        where: { userId: user.id },
+      });
       expect(links).toHaveLength(1);
 
-      const pwLogin = await submitLogin(request.agent(app), user.email, PASSWORD);
+      const pwLogin = await submitLogin(
+        request.agent(app),
+        user.email,
+        PASSWORD,
+      );
       expect(pwLogin.status).toBe(303); // the owner's own password still works
     });
 
@@ -1113,12 +1269,18 @@ describe("Web pages (server-rendered)", () => {
       const res = await finishFlow(agent, await startFlow(agent));
       expect(res.headers.location).toBe("/dashboard");
 
-      const dbUser = await prisma.user.findUnique({ where: { email: data.email } });
+      const dbUser = await prisma.user.findUnique({
+        where: { email: data.email },
+      });
       expect(dbUser.emailVerified).toBe(true);
       expect(dbUser.passwordHash).toBeNull();
 
       // …so the attacker's password no longer opens the victim's account
-      const attackerLogin = await submitLogin(request.agent(app), data.email, attackerPassword);
+      const attackerLogin = await submitLogin(
+        request.agent(app),
+        data.email,
+        attackerPassword,
+      );
       expect(attackerLogin.status).toBe(401);
     });
 
@@ -1131,13 +1293,18 @@ describe("Web pages (server-rendered)", () => {
 
       expect(res.status).toBe(303);
       expect(res.headers.location).toBe("/login?error=oauth-failed");
-      const links = await prisma.oauthAccount.findMany({ where: { userId: user.id } });
+      const links = await prisma.oauthAccount.findMany({
+        where: { userId: user.id },
+      });
       expect(links).toHaveLength(0);
     });
 
     it("a suspended account is turned away with its own message", async () => {
       const user = await createVerifiedUser("gsusp");
-      await prisma.user.update({ where: { id: user.id }, data: { status: "SUSPENDED" } });
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { status: "SUSPENDED" },
+      });
       fakeGoogle(googleProfile({ email: user.email }));
       const agent = request.agent(app);
 
@@ -1146,7 +1313,9 @@ describe("Web pages (server-rendered)", () => {
       expect(res.headers.location).toBe("/login?error=oauth-suspended");
       expect(cookieLine(res, "accessToken")).toBeUndefined();
 
-      const page = await request(app).get("/login?error=oauth-suspended").set(HTML);
+      const page = await request(app)
+        .get("/login?error=oauth-suspended")
+        .set(HTML);
       expect(page.text).toContain("suspended or deactivated");
     });
 
@@ -1179,7 +1348,9 @@ describe("Web pages (server-rendered)", () => {
 
       const first = await finishFlow(agent, state);
       expect(first.headers.location).toBe("/dashboard");
-      expect(cookieLine(first, "oauth_state")).toMatch(/Expires=Thu, 01 Jan 1970/); // cleared
+      expect(cookieLine(first, "oauth_state")).toMatch(
+        /Expires=Thu, 01 Jan 1970/,
+      ); // cleared
 
       // replaying the same callback URL from a cookie-less client fails
       const replay = await finishFlow(request(app), state);
@@ -1194,15 +1365,50 @@ describe("Web pages (server-rendered)", () => {
       expect(res.status).toBe(303);
       expect(res.headers.location).toBe("/login?error=oauth-cancelled");
 
-      const page = await request(app).get("/login?error=oauth-cancelled").set(HTML);
+      const page = await request(app)
+        .get("/login?error=oauth-cancelled")
+        .set(HTML);
       expect(page.text).toContain("Google sign-in was cancelled.");
     });
 
     it("ignores unknown ?error= values on the login page", async () => {
-      const res = await request(app).get("/login?error=Your account was hacked").set(HTML);
+      const res = await request(app)
+        .get("/login?error=Your account was hacked")
+        .set(HTML);
 
       expect(res.text).not.toContain("Your account was hacked");
       expect(res.text).not.toContain('class="auth-error"');
+    });
+
+    it("a Google-only user sees 'set a password' instead of the change form", async () => {
+      fakeGoogle(googleProfile({ email: uniqueUser("gnopw").email }));
+      const agent = request.agent(app);
+      await finishFlow(agent, await startFlow(agent));
+
+      const res = await agent.get("/settings").set(HTML);
+
+      expect(res.text).toContain('action="/settings/password-link"');
+      expect(res.text).not.toContain('action="/settings/password"');
+    });
+
+    it("'email me a link' creates a reset link for a Google-only user", async () => {
+      const email = uniqueUser("gsetpw").email;
+      fakeGoogle(googleProfile({ email }));
+      const agent = request.agent(app);
+      await finishFlow(agent, await startFlow(agent));
+      const _csrf = await getToken(agent, "/settings");
+
+      const res = await agent
+        .post("/settings/password-link")
+        .type("form")
+        .send({ _csrf });
+
+      expect(res.headers.location).toBe("/settings?updated=password-link");
+      const dbUser = await prisma.user.findUnique({ where: { email } });
+      const resets = await prisma.passwordReset.findMany({
+        where: { userId: dbUser.id },
+      });
+      expect(resets).toHaveLength(1);
     });
   });
 
@@ -1220,7 +1426,11 @@ describe("Web pages (server-rendered)", () => {
           .post("/login")
           .set("X-Forwarded-For", ip)
           .type("form")
-          .send({ _csrf, loginIdentifier: "nobody@example.com", password: "WrongP@ssw0rd1!" });
+          .send({
+            _csrf,
+            loginIdentifier: "nobody@example.com",
+            password: "WrongP@ssw0rd1!",
+          });
         if (res.status === 429) break;
       }
 
@@ -1263,7 +1473,9 @@ describe("Web pages (server-rendered)", () => {
     });
 
     it("a missing image returns a small JSON 404, not a whole page", async () => {
-      const res = await request(app).get("/images/nope.png").set("Accept", "image/*");
+      const res = await request(app)
+        .get("/images/nope.png")
+        .set("Accept", "image/*");
 
       expect(res.status).toBe(404);
       expect(res.headers["content-type"]).toMatch(/json/);

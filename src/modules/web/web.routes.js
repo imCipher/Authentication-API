@@ -1,5 +1,6 @@
 import { Router } from "express";
 import webController from "./web.controller.js";
+import adminWebRoutes from "./admin.web.routes.js";
 import {
   loginRateLimiter,
   registerRateLimiter,
@@ -24,7 +25,12 @@ router.use(ensureSessionId, doubleCsrfProtection, exposeCsrfToken);
 router.get("/login", guestOnly, webController.showLogin);
 router.post("/login", loginRateLimiter, webController.submitLogin);
 // Continue with Google (the callback URL must be registered in Google Cloud Console)
-router.get("/auth/google", guestOnly, authRateLimiter, webController.startGoogle);
+router.get(
+  "/auth/google",
+  guestOnly,
+  authRateLimiter,
+  webController.startGoogle,
+);
 router.get("/auth/google/callback", webController.googleCallback);
 
 router.get("/register", guestOnly, webController.showRegister);
@@ -62,8 +68,18 @@ router.post(
   authRateLimiter,
   webController.changePassword,
 );
+router.post(
+  "/settings/password-link",
+  requireAuthPage,
+  passwordResetRateLimiter,
+  webController.sendSetPasswordLink,
+);
+
 router.post("/settings/logout-all", requireAuthPage, webController.logoutAll);
 router.post("/logout", requireAuthPage, webController.logout);
+
+// Admin pages (every route inside requires the ADMIN role)
+router.use("/admin", adminWebRoutes);
 
 router.use((err, req, res, next) => {
   if (err.statusCode !== 429) return next(err);

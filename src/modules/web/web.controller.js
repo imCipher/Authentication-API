@@ -96,7 +96,11 @@ const startGoogle = (req, res, next) => {
   if (!isGoogleConfigured) {
     return res.redirect(303, "/login?error=oauth-unavailable");
   }
-  return passport.authenticate("google-web", { session: false })(req, res, next);
+  return passport.authenticate("google-web", { session: false })(
+    req,
+    res,
+    next,
+  );
 };
 
 // Step 2: Google sends the browser back here with ?code=…&state=…
@@ -107,7 +111,8 @@ const googleCallback = (req, res, next) => {
 
   // The user pressed "Cancel" on Google's consent screen (or Google refused)
   if (req.query.error) {
-    const reason = req.query.error === "access_denied" ? "oauth-cancelled" : "oauth-failed";
+    const reason =
+      req.query.error === "access_denied" ? "oauth-cancelled" : "oauth-failed";
     return res.redirect(303, `/login?error=${reason}`);
   }
 
@@ -125,7 +130,10 @@ const googleCallback = (req, res, next) => {
       setAuthCookies(res, tokens);
       return res.redirect(303, "/dashboard");
     } catch (loginErr) {
-      if (loginErr instanceof ApiError && loginErr.code === "ACCOUNT_SUSPENDED") {
+      if (
+        loginErr instanceof ApiError &&
+        loginErr.code === "ACCOUNT_SUSPENDED"
+      ) {
         return res.redirect(303, "/login?error=oauth-suspended");
       }
       return next(loginErr);
@@ -348,9 +356,13 @@ const submitResetPassword = CatchAsync(async (req, res) => {
   return res.redirect(303, "/login?reason=password-reset");
 });
 
-const SETTINGS_NOTICES = { profile: "Your profile has been updated." };
+const SETTINGS_NOTICES = {
+  profile: "Your profile has been updated.",
+  "password-link":
+    "We've emailed you a link to set your password. It expires in 5 minutes.",
+};
 
-const renderSettings = (
+const renderSettings = async (
   req,
   res,
   { status = 200, errors = {}, values = {} } = {},
@@ -361,10 +373,16 @@ const renderSettings = (
       errors,
       values,
       notice: SETTINGS_NOTICES[req.query.updated] ?? null,
+      hasPassword: await AuthService.hasPassword(req.user.id),
     });
 
 const showDashboard = (req, res) => res.render("pages/dashboard");
-const showSettings = (req, res) => renderSettings(req, res);
+const showSettings = CatchAsync(async (req, res) => renderSettings(req, res));
+
+const sendSetPasswordLink = CatchAsync(async (req, res) => {
+  await AuthService.sendPasswordResetEmail(req.user.email);
+  return res.redirect(303, "/settings?updated=password-link");
+});
 
 const updateProfile = CatchAsync(async (req, res) => {
   const { fullName = "", username = "" } = req.body;
@@ -472,4 +490,5 @@ export default {
   submitForgotPassword,
   showResetPassword,
   submitResetPassword,
+  sendSetPasswordLink,
 };

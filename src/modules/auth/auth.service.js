@@ -14,6 +14,18 @@ import redisService from "../../config/redis.js";
  */
 class AuthService {
   /**
+   * Whether the user has a password (Google-only accounts don't).
+   * Returns a boolean — the hash itself never leaves this method.
+   */
+  async hasPassword(userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { passwordHash: true },
+    });
+    return Boolean(user?.passwordHash);
+  }
+
+  /**
    * Registers a new user in the system.
    *
    * @param {Object} userdata - The user data for registration.

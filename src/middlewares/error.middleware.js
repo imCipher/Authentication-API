@@ -81,7 +81,10 @@ export const errorHandler = (err, req, res, next) => {
       message: "The page you're looking for doesn't exist or has been moved.",
     },
     429: { title: "Slow down", message: null }, // null → use err.message (your limiter text)
-    403: { title: "Session expired", message: "This form expired. Please go back, refresh the page and try again." },
+    403: {
+      title: "Access denied",
+      message: "You don't have permission to view this page.",
+    },
     500: {
       title: "Something went wrong",
       message: "An unexpected error occurred. Please try again later.",
@@ -95,8 +98,14 @@ export const errorHandler = (err, req, res, next) => {
 
   if (wantsPage) {
     const statusCode = error.statusCode;
+    // A rejected CSRF token is also a 403, but it means "form expired", not "not allowed"
+    const CSRF_COPY = {
+      title: "Session expired",
+      message: "This form expired. Please go back, refresh the page and try again.",
+    };
     const copy =
-      PAGE_COPY[statusCode] || (statusCode >= 500 ? PAGE_COPY[500] : null);
+      error.code === "EBADCSRFTOKEN" ? CSRF_COPY
+      : PAGE_COPY[statusCode] || (statusCode >= 500 ? PAGE_COPY[500] : null);
 
     return res
       .status(statusCode)

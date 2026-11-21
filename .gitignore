@@ -30,7 +30,6 @@ build/
 
 # Prisma Generated Client
 generated/
-prisma/migrations/
 
 # Claude Files
 .claude/

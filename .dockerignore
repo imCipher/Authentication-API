@@ -1,0 +1,24 @@
+# Installed inside the image instead — your Windows copy would break on Linux
+node_modules
+
+# Regenerated inside the image by "prisma generate"
+generated
+
+# SECRETS — must never end up inside an image
+.env
+.env.*
+
+# Not needed to run the app
+.git
+.gitignore
+.gitattributes
+tests
+coverage
+logs
+*.log
+.vscode
+.idea
+.claude
+system.md
+Dockerfile
+.dockerignore

@@ -1,0 +1,83 @@
+# The name shown in GitHub's "Actions" tab and on the badge
+name: Tests
+
+# WHEN to run: every push to main, and every pull request (any branch)
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only access to the repo is all this workflow needs (safer default)
+permissions:
+  contents: read
+
+# If you push again while tests are still running, cancel the old run
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest   # a fresh Linux machine, deleted afterwards
+    timeout-minutes: 15      # stop if something hangs
+
+    # Extra containers started BEFORE the steps — your tests need both
+    services:
+      postgres:
+        image: postgres:18   # same major version as your local and production DB
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: auth_test
+        ports:
+          - 5432:5432        # reachable from the steps as localhost:5432
+        # wait until Postgres is actually ready before running steps
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Environment variables for every step below
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/auth_test?schema=public
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: "6379"
+
+    steps:
+      # 1. Download your repository onto the runner
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      # 2. Install Node 26 (same as your PC and your Dockerfile), with npm caching
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 26
+          cache: npm
+
+      # 3. Install exact versions from package-lock.json (like in the Dockerfile)
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Build the Prisma client (generated/ isn't in git)
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      # 5. Create the tables in the empty test database from your migrations
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
+      # 6. Run all tests — any failure turns the whole run red ❌
+      - name: Run tests
+        run: npm test

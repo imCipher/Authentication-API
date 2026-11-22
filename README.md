@@ -1,4 +1,5 @@
 # Authentication with Prisma
+[![Tests](https://github.com/imCipher/Authentication-API/actions/workflows/tests.yml/badge.svg)](https://github.com/imCipher/Authentication-API/actions/workflows/tests.yml)
 
 A production-style authentication system built with **Node.js, Express 5, Prisma 7, PostgreSQL and Redis**: a JSON REST API **and** a server-rendered website (EJS) on top of the same service layer, deployed with Docker.
 

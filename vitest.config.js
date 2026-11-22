@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    // Allow slow (argon2) tests more time, especially on CI machines
+    testTimeout: 20000,
     // Make describe, it, expect, vi globally available (like Jest)
     globals: true,
     // Node.js environment
